@@ -11,6 +11,24 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  build: {
+    // Enable code splitting for lazy-loaded modules
+    rollupOptions: {
+      output: {
+        manualChunks: (id) => {
+          if (id.includes('CertificatesPage') || id.includes('CertificateLedgerPage') || 
+              id.includes('DrcCertificateViewPage') || id.includes('DrcByIdPage')) {
+            return 'certificate-pages'
+          }
+          if (id.includes('DrcHistoryEventDetailPage') || id.includes('DrcHistoryTreePage')) {
+            return 'history-pages'
+          }
+        },
+      },
+    },
+    // Increase chunk size warning limit (in bytes) - 1.5 MB
+    chunkSizeWarningLimit: 1536,
+  },
   server: {
     proxy: {
       '/api': {

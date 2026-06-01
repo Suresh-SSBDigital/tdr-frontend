@@ -115,7 +115,13 @@ export default function DrcApiDetailPage() {
       ['Remaining Area (sq.m)', (() => {
         const totalArea = drc?.land?.total_area ?? drc?.land?.proposed_area ?? 0
         const proposedArea = drc?.land?.proposed_area ?? 0
-        const remainingArea = totalArea - proposedArea - (drc?.transferred_tdr_value ?? 0) - (drc?.utilized_tdr_value ?? 0)
+        const remainingArea =
+          totalArea -
+          proposedArea -
+          (drc?.transferred_tdr_value ?? 0) -
+          (drc?.utilized_tdr_value ?? 0)
+
+
         return remainingArea > 0 ? remainingArea.toLocaleString('en-IN') : '—'
       })()],
 

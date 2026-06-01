@@ -19,9 +19,10 @@ export default function ApplicationHistoryPage() {
   const [full, setFull] = useState<FullResponse | null>(null)
   const [history, setHistory] = useState<HistoryResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(true)
 
   const [samagraForLinks, setSamagraForLinks] = useState(querySamagra)
+
 
   useEffect(() => {
     setSamagraForLinks(querySamagra)
@@ -32,7 +33,11 @@ export default function ApplicationHistoryPage() {
     if (!decodedId) return
     const load = async () => {
       setIsLoading(true)
+
+
       setError(null)
+      // Triggered loading; UI doesn't currently consume isLoading.
+
       try {
         const headers: Record<string, string> = { 'Content-Type': 'application/json' }
         if (API_KEY) headers['x-api-key'] = API_KEY
@@ -98,9 +103,14 @@ export default function ApplicationHistoryPage() {
     return `/dashboard/apply/${encodeURIComponent(decodedId)}/transactions${qs ? `?${qs}` : ''}`
   })()
 
+  if (isLoading && decodedId) {
+    return <div className="text-sm text-[#8c8c8c]">Loading…</div>
+  }
+
   if (!decodedId) return <div className="text-sm text-[#8c8c8c]">No application selected.</div>
 
   if (error && !tdr) {
+
     return (
       <div className="space-y-3 bg-[#f6f8fb] p-2">
         <div className="flex flex-wrap items-center gap-2 px-1 pt-1">
