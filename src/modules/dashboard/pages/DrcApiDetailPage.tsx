@@ -112,7 +112,13 @@ export default function DrcApiDetailPage() {
 
       ['Total Area', drc?.land?.total_area ?? drc?.land?.proposed_area ?? '—'],
       ['Proposed Area', drc?.land?.proposed_area ?? drc?.land?.total_area ?? '—'],
-      ['Remaining Area (sq.m)', drc?.land?.total_area - (drc?.land?.proposed_area ?? 0) - (drc?.transferred_tdr_value ?? 0) - (drc?.utilized_tdr_value ?? 0) > 0 ? (drc?.land?.total_area - (drc?.land?.proposed_area ?? 0) - (drc?.transferred_tdr_value ?? 0) - (drc?.utilized_tdr_value ?? 0)).toLocaleString('en-IN') : '—'],
+      ['Remaining Area (sq.m)', (() => {
+        const totalArea = drc?.land?.total_area ?? drc?.land?.proposed_area ?? 0
+        const proposedArea = drc?.land?.proposed_area ?? 0
+        const remainingArea = totalArea - proposedArea - (drc?.transferred_tdr_value ?? 0) - (drc?.utilized_tdr_value ?? 0)
+        return remainingArea > 0 ? remainingArea.toLocaleString('en-IN') : '—'
+      })()],
+
       ['Value TDR', drc?.land?.value_tdr ?? '—'],
       ['Total TDR Value', drc?.total_tdr_value ?? '—'],
       ['Transferred TDR Value', drc?.transferred_tdr_value ?? drc?.transfer_tdr_value ?? '—'],

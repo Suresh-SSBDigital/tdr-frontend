@@ -113,7 +113,8 @@ export function DetailPanel({
             </div>
           ) : (
             <div className="space-y-0">
-              {fields.map((f, idx) => {
+              {fields.map((f) => {
+
                 const isNumeric = typeof f.value === 'string' && /^[₹\d,.\s-]+$/.test(String(f.value));
                 const isId = typeof f.value === 'string' && (String(f.value).length > 20 || String(f.label).toLowerCase().includes('id'));
                 const isLink = typeof f.value === 'string' && (String(f.label).toLowerCase().includes('url') || String(f.label).toLowerCase().includes('link'));

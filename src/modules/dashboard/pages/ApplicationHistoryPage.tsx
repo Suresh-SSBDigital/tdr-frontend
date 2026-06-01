@@ -19,7 +19,8 @@ export default function ApplicationHistoryPage() {
   const [full, setFull] = useState<FullResponse | null>(null)
   const [history, setHistory] = useState<HistoryResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const [, setIsLoading] = useState(true)
+
   const [samagraForLinks, setSamagraForLinks] = useState(querySamagra)
 
   useEffect(() => {
