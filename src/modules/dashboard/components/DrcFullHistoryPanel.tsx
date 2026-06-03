@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { FiSearch, FiX } from 'react-icons/fi'
 import TableActionMenu from './TableActionMenu'
 
 import {
@@ -125,6 +126,13 @@ export default function DrcFullHistoryPanel() {
   const setCertificatesDataLoading =
     useCertificatesSetDataLoading()
 
+  // ======================================================
+  // NEW: FILTER STATES
+  // ======================================================
+  const [searchQuery, setSearchQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState<ApiStatus | 'all'>('all')
+  const [actionTypeFilter, setActionTypeFilter] = useState<DrcHistoryFlatRow['actionType'] | 'all'>('all')
+
   useLayoutEffect(() => {
     setCertificatesDataLoading(true)
 
@@ -205,10 +213,8 @@ export default function DrcFullHistoryPanel() {
             drc_certificate?: string | { hash?: string }
           }>
         }
-
         const certs = data.certificates ?? []
         const total = Number(data.countTotal ?? 0)
-
         if (!active) return
 
         setCountTotal(total)
@@ -282,6 +288,47 @@ export default function DrcFullHistoryPanel() {
       active = false
     }
   }, [pagination.pageIndex, pagination.pageSize, setCertificatesDataLoading])
+
+  // ======================================================
+  // UTILITY: Search across all row values
+  // ======================================================
+  const searchInObject = (obj: Record<string, any>, query: string): boolean => {
+    return Object.values(obj).some((value) => {
+      if (value == null) return false
+      if (typeof value === 'string') return value.toLowerCase().includes(query)
+      if (typeof value === 'number') return String(value).includes(query)
+      if (typeof value === 'boolean') return String(value).includes(query)
+      return false
+    })
+  }
+
+  // ======================================================
+  // FILTERED ROWS - Client-side filtering
+  // ======================================================
+
+  const filteredRows = useMemo(() => {
+    let filtered = [...rows]
+
+    // Apply search query - searches across ALL fields/keys
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim()
+      filtered = filtered.filter((row) => searchInObject(row, query))
+    }
+
+    // Apply status filter
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter((row) => row.status === statusFilter)
+    }
+
+    // Apply action type filter
+    if (actionTypeFilter !== 'all') {
+      filtered = filtered.filter((row) => row.actionType === actionTypeFilter)
+    }
+
+    return filtered
+  }, [rows, searchQuery, statusFilter, actionTypeFilter])
+  console.log(filteredRows, "filteredRows")
+  const filteredCount = filteredRows.length
   // ======================================================
   // COLUMNS
   // ======================================================
@@ -354,7 +401,7 @@ export default function DrcFullHistoryPanel() {
       }),
 
       columnHelper.accessor('actionType', {
-        header: 'Action',
+        header: 'Action Type',
         cell: (info) => {
           const ap =
             actionTypePresentation[info.getValue()]
@@ -376,7 +423,7 @@ export default function DrcFullHistoryPanel() {
       }),
 
       columnHelper.accessor('totalArea', {
-        header: 'Total Area',
+        header: 'Total Area (sq.m)',
         cell: (info) => (
           <span className="font-semibold text-sky-700">
             {info.getValue() ?? '—'}
@@ -385,7 +432,7 @@ export default function DrcFullHistoryPanel() {
       }),
 
       columnHelper.accessor('proposedArea', {
-        header: 'Proposed Area',
+        header: 'Proposed Area (sq.m)',
         cell: (info) => (
           <span className="font-semibold text-orange-600">
             {info.getValue() ?? '—'}
@@ -393,18 +440,8 @@ export default function DrcFullHistoryPanel() {
         ),
       }),
 
-      columnHelper.accessor('remainingTdrValue', {
-        header: 'Remaining TDR',
-        cell: (info) => (
-          <span className="font-bold text-emerald-700">
-            {info.getValue()?.toLocaleString('en-IN') ??
-              '—'}
-          </span>
-        ),
-      }),
-
       columnHelper.accessor('timestamp', {
-        header: 'Date',
+        header: 'Created Date',
         cell: (info) => (
           <span className="text-slate-600">
             {info.getValue()}
@@ -452,7 +489,7 @@ export default function DrcFullHistoryPanel() {
   // ======================================================
 
   const table = useReactTable({
-    data: rows,
+    data: filteredRows,
     columns,
     state: {
       sorting,
@@ -487,49 +524,175 @@ export default function DrcFullHistoryPanel() {
   return (
     <section className={cardClass}>
       {/* HEADER */}
-      <div
-        className="
-          flex items-center justify-between
-          border-b border-slate-200
-          bg-gradient-to-r
-          from-[#0f172a]
-          via-[#1d4ed8]
-          to-[#312e81]
-          px-6 py-5
-        "
-      >
-        <div>
-          <h2 className="text-xl font-bold text-white">
-            DRC Certificate Ledger
-          </h2>
+      <div className="border-b border-slate-200 bg-white">
+        {/* Header */}
+        <div className="flex flex-col gap-4 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-slate-900">
+              DRC Certificate Ledger
+            </h2>
 
-          <p className="mt-1 text-xs text-blue-100">
-            Complete blockchain transaction history &
-            tracking
-          </p>
+            <p className="mt-1 text-sm text-slate-500">
+              Complete transaction history and certificate tracking
+            </p>
+          </div>
+          <div className="flex  items-center gap-6 border-t border-slate-100 px-6 py-3">
+            <div className="flex items-center gap-2 bg-red-200 px-3 py-1 rounded-md">
+              <span className="text-sm font-medium text-slate-500">
+                Total Records:
+              </span>
+              <span className="text-lg font-bold text-slate-900">
+                {countTotal.toLocaleString()}
+              </span>
+            </div>
+
+            <div className="h-5 w-px bg-slate-300" />
+
+            <div className="flex items-center gap-2 bg-green-200 px-3 py-1 rounded-md">
+              <span className="text-sm font-medium text-slate-500">
+                Active Filters:
+              </span>
+              <span className="text-lg font-bold text-blue-600">
+                {
+                  [
+                    searchQuery,
+                    statusFilter !== 'all',
+                    actionTypeFilter !== 'all',
+                  ].filter(Boolean).length
+                }
+              </span>
+            </div>
+          </div>
+          <button
+            onClick={() => downloadDrcHistoryCsv(filteredRows)}
+            className="
+        inline-flex items-center gap-2
+        rounded-lg
+        border border-slate-300
+        bg-white
+        px-4 py-2
+        text-sm font-medium
+        text-slate-700
+        hover:bg-slate-50
+      "
+          >
+            <svg
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 4v12m0 0l-4-4m4 4l4-4M4 20h16"
+              />
+            </svg>
+            Export CSV
+          </button>
         </div>
 
-        <button
-          onClick={() =>
-            downloadDrcHistoryCsv(
-              table
-                .getSortedRowModel()
-                .rows.map((r) => r.original),
-            )
-          }
-          className="
-            rounded-xl
-            border border-white/20
-            bg-white/10
-            px-4 py-2
-            text-xs font-semibold text-white
-            backdrop-blur-md
-            transition-all
-            hover:bg-white/20
+        {/* Filters */}
+        <div className="border-t border-slate-100 px-6 py-4">
+          <div className="grid gap-3 lg:grid-cols-12">
+
+            {/* Search */}
+            <div className="relative lg:col-span-6">
+              <FiSearch className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search certificate no, holder, application ID..."
+                className="
+            w-full rounded-lg border border-slate-300
+            py-2.5 pl-10 pr-10 text-sm
+            focus:border-blue-500
+            focus:ring-2 focus:ring-blue-100
+            outline-none
           "
-        >
-          Export CSV
-        </button>
+              />
+
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2"
+                >
+                  <FiX className="h-4 w-4 text-slate-400" />
+                </button>
+              )}
+            </div>
+
+            {/* Status */}
+            <div className="lg:col-span-2">
+              <select
+                value={statusFilter}
+                onChange={(e) =>
+                  setStatusFilter(
+                    e.target.value as ApiStatus | 'all'
+                  )
+                }
+                className="
+            w-full rounded-lg border border-slate-300
+            px-3 py-2.5 text-sm
+          "
+              >
+                <option value="all">All Status</option>
+                <option value="VALID">Valid</option>
+                <option value="TRANSFERRED">Transferred</option>
+                <option value="UTILIZED">Utilized</option>
+                <option value="EDITED">Edited</option>
+                <option value="DELETED">Deleted</option>
+              </select>
+            </div>
+
+            {/* Action */}
+            <div className="lg:col-span-2">
+              <select
+                value={actionTypeFilter}
+                onChange={(e) =>
+                  setActionTypeFilter(
+                    e.target.value as DrcHistoryFlatRow['actionType'] | 'all'
+                  )
+                }
+                className="
+            w-full rounded-lg border border-slate-300
+            px-3 py-2.5 text-sm
+          "
+              >
+                <option value="all">All Actions</option>
+                <option value="CREATE">Issued</option>
+                <option value="UPDATE">Updated</option>
+                <option value="TRANSFER">Transferred</option>
+                <option value="UTILIZATION">Utilized</option>
+                <option value="DELETE">Deleted</option>
+              </select>
+            </div>
+
+            {/* Reset */}
+            <div className="lg:col-span-2">
+              <button
+                onClick={() => {
+                  setSearchQuery('')
+                  setStatusFilter('all')
+                  setActionTypeFilter('all')
+                }}
+                className="
+            w-full rounded-lg
+            border border-slate-300
+            bg-slate-50
+            px-4 py-2.5
+            text-sm font-medium
+            hover:bg-slate-100
+          "
+              >
+                Reset Filters
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* TABLE */}
@@ -566,10 +729,9 @@ export default function DrcFullHistoryPanel() {
                   className={`
                     transition-all duration-200
                     hover:bg-blue-50/60
-                    ${
-                      rowIndex % 2 === 0
-                        ? 'bg-white'
-                        : 'bg-slate-50/40'
+                    ${rowIndex % 2 === 0
+                      ? 'bg-white'
+                      : 'bg-slate-50/40'
                     }
                   `}
                 >
@@ -596,65 +758,96 @@ export default function DrcFullHistoryPanel() {
       {/* FOOTER */}
       <div
         className="
-          flex items-center justify-between
+          flex flex-col items-center justify-between gap-4
           border-t border-slate-200
-          bg-slate-50
+          bg-gradient-to-r from-slate-50 to-slate-100
           px-6 py-4
+          sm:flex-row
         "
       >
-        <div className="text-xs text-slate-500">
-          Showing{' '}
-          <span className="font-bold text-slate-700">
-            {countTotal}
-          </span>{' '}
-          records
+        <div className="text-sm text-slate-600">
+          <span className="font-semibold text-slate-900">
+            {(table.getState().pagination.pageIndex * table.getState().pagination.pageSize) + table.getRowModel().rows.length}
+          </span>
+          {' '} of {' '}
+          <span className="font-semibold text-slate-900">
+            {filteredCount.toLocaleString()}
+          </span>
+          {' '}
+          {searchQuery || statusFilter !== 'all' || actionTypeFilter !== 'all' ? (
+            <>
+              <span className="text-slate-500">filtered</span> {' '}
+              <span className="inline-block rounded-full bg-slate-200 px-2 py-0.5 text-xs text-slate-700">
+                Total: {countTotal.toLocaleString()}
+              </span>
+            </>
+          ) : (
+            'records'
+          )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-center gap-2">
           <button
             onClick={() => table.previousPage()}
             disabled={!table.getCanPreviousPage()}
             className="
-              rounded-xl
-              border border-slate-200
+              inline-flex items-center gap-1
+              rounded-lg
+              border border-slate-300
               bg-white
-              px-4 py-2
-              text-xs font-semibold
-              disabled:opacity-40
+              px-3 py-2
+              text-sm font-semibold
+              text-slate-700
+              hover:bg-slate-50 hover:border-slate-400
+              disabled:opacity-40 disabled:cursor-not-allowed
+              transition
             "
           >
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
             Previous
           </button>
 
           <div
             className="
-              rounded-xl
-              bg-gradient-to-r
-              from-[#1d4ed8]
-              to-[#4338ca]
+              inline-flex items-center gap-1
+              rounded-lg
+              bg-gradient-to-r from-blue-600 to-indigo-600
               px-4 py-2
-              text-xs font-bold text-white
+              text-sm font-bold text-white
+              shadow-md
             "
           >
-            Page{' '}
-            {table.getState().pagination.pageIndex +
-              1}{' '}
-            of {table.getPageCount()}
+            <span>
+              {table.getState().pagination.pageIndex + 1}
+            </span>
+            <span className="text-blue-200">/</span>
+            <span>
+              {table.getPageCount()}
+            </span>
           </div>
 
           <button
             onClick={() => table.nextPage()}
             disabled={!table.getCanNextPage()}
             className="
-              rounded-xl
-              border border-slate-200
+              inline-flex items-center gap-1
+              rounded-lg
+              border border-slate-300
               bg-white
-              px-4 py-2
-              text-xs font-semibold
-              disabled:opacity-40
+              px-3 py-2
+              text-sm font-semibold
+              text-slate-700
+              hover:bg-slate-50 hover:border-slate-400
+              disabled:opacity-40 disabled:cursor-not-allowed
+              transition
             "
           >
             Next
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
           </button>
         </div>
       </div>

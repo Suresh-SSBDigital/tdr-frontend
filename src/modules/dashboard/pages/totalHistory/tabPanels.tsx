@@ -27,6 +27,38 @@ import {
   thClass,
 } from './shared'
 
+// ============================================
+// HELPER FUNCTIONS FOR SEARCH & FILTER
+// ============================================
+
+function normalizeSearch(s: string): string {
+  return (s ?? '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function tokenizeQuery(query: string): string[] {
+  const q = normalizeSearch(query)
+  return q.split(' ').filter((t) => t.length > 0)
+}
+
+
+
+function searchInObject(obj: Record<string, unknown>, query: string): boolean {
+  const tokens = tokenizeQuery(query)
+  if (tokens.length === 0) return true
+
+  const searchStr = JSON.stringify(obj).toLowerCase()
+  return tokens.every((token) => searchStr.includes(token))
+}
+
+function parseDate(dateStr: string): Date | null {
+  if (!dateStr) return null
+  const dt = new Date(dateStr)
+  return Number.isNaN(dt.getTime()) ? null : dt
+}
+
 type TabPanelsProps = {
   historyData: RidHistoryResponse
   rid: string
@@ -292,10 +324,201 @@ export function AllTransactionsTab({ historyData, rid }: TabPanelsProps) {
   )
   const [selected, setSelected] = useState<FlatAllTransactionRow | null>(null)
 
+  // ============================================
+  // SEARCH, SORT, FILTER STATES
+  // ============================================
+  const [searchQuery, setSearchQuery] = useState('')
+  const [sortKey, setSortKey] = useState<'type' | 'date' | 'status' | 'area'>('date')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+  const [typeFilter, setTypeFilter] = useState<string>('all')
+  const [statusFilter, setStatusFilter] = useState<string>('all')
+
+  // ============================================
+  // EXTRACT FILTER OPTIONS
+  // ============================================
+  const uniqueTypes = useMemo(
+    () => Array.from(new Set(rows.map((r) => r.txType).filter(Boolean))).sort(),
+    [rows],
+  )
+  const uniqueStatuses = useMemo(
+    () => Array.from(new Set(rows.map((r) => r.status).filter(Boolean))).sort(),
+    [rows],
+  )
+
+  // ============================================
+  // APPLY SEARCH, FILTER, SORT
+  // ============================================
+  const processedRows = useMemo(() => {
+    let filtered = rows.filter((row) => {
+      // Search
+      if (searchQuery.trim()) {
+        if (!searchInObject(row as Record<string, unknown>, searchQuery)) return false
+      }
+      // Type filter
+      if (typeFilter !== 'all' && row.txType !== typeFilter) return false
+      // Status filter
+      if (statusFilter !== 'all' && row.status !== statusFilter) return false
+      return true
+    })
+
+    // Sort
+    filtered.sort((a, b) => {
+      let aVal: string | number | Date = ''
+      let bVal: string | number | Date = ''
+
+      switch (sortKey) {
+        case 'type':
+          aVal = a.txType || ''
+          bVal = b.txType || ''
+          break
+        case 'date':
+          aVal = parseDate(a.date as string) || new Date(0)
+          bVal = parseDate(b.date as string) || new Date(0)
+          break
+        case 'status':
+          aVal = a.status || ''
+          bVal = b.status || ''
+          break
+        case 'area':
+          aVal = a.area || 0
+          bVal = b.area || 0
+          break
+        default:
+          return 0
+      }
+
+      if (aVal < bVal) return sortDir === 'asc' ? -1 : 1
+      if (aVal > bVal) return sortDir === 'asc' ? 1 : -1
+      return 0
+    })
+
+    return filtered
+  }, [rows, searchQuery, typeFilter, statusFilter, sortKey, sortDir])
+
+  const totalCount = rows.length
+  const filteredCount = processedRows.length
+
   return (
     <>
       <TableShell title="All Transactions" count={rows.length}>
-        <TransactionsTable rows={rows} rid={rid} onSelect={setSelected} selectedKey={selected?.rowKey} />
+        {/* FILTER CONTROLS ROW */}
+        <div className="border-b border-slate-200 bg-gradient-to-r from-slate-50 to-blue-50 px-5 py-4">
+          <div className="space-y-4">
+            {/* Row 1: Search */}
+            <div>
+              <label className="mb-2 block text-xs font-semibold text-slate-700 uppercase tracking-wide">Search</label>
+              <div className="relative">
+                <svg className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search across all fields..."
+                  className="w-full rounded-lg border border-slate-300 bg-white pl-10 pr-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 transition"
+                />
+              </div>
+            </div>
+
+            {/* Row 2: Filters */}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              {/* Type Filter */}
+              <div>
+                <label className="mb-2 block text-xs font-semibold text-slate-700 uppercase tracking-wide">Type</label>
+                <select
+                  value={typeFilter}
+                  onChange={(e) => setTypeFilter(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 transition"
+                >
+                  <option value="all">All Types</option>
+                  {uniqueTypes.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Status Filter */}
+              <div>
+                <label className="mb-2 block text-xs font-semibold text-slate-700 uppercase tracking-wide">Status</label>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 transition"
+                >
+                  <option value="all">All Status</option>
+                  {uniqueStatuses.map((status) => (
+                    <option key={status} value={status}>
+                      {status}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Sort By */}
+              <div>
+                <label className="mb-2 block text-xs font-semibold text-slate-700 uppercase tracking-wide">Sort By</label>
+                <select
+                  value={sortKey}
+                  onChange={(e) => setSortKey(e.target.value as 'type' | 'date' | 'status' | 'area')}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 transition"
+                >
+                  <option value="date">Date</option>
+                  <option value="type">Type</option>
+                  <option value="status">Status</option>
+                  <option value="area">Area</option>
+                </select>
+              </div>
+
+              {/* Sort Order */}
+              <div>
+                <label className="mb-2 block text-xs font-semibold text-slate-700 uppercase tracking-wide">Order</label>
+                <select
+                  value={sortDir}
+                  onChange={(e) => setSortDir(e.target.value as 'asc' | 'desc')}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 transition"
+                >
+                  <option value="desc">Descending ↓</option>
+                  <option value="asc">Ascending ↑</option>
+                </select>
+              </div>
+
+              {/* Statistics + Reset */}
+              <div className="flex flex-col gap-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="rounded-lg border border-blue-200 bg-blue-50 px-2 py-2.5">
+                    <p className="text-[10px] font-semibold uppercase text-blue-600">Showing</p>
+                    <p className="text-lg font-bold text-blue-900">{filteredCount}</p>
+                  </div>
+                  {(searchQuery || typeFilter !== 'all' || statusFilter !== 'all') && (
+                    <div className="rounded-lg border border-slate-200 bg-slate-100 px-2 py-2.5">
+                      <p className="text-[10px] font-semibold uppercase text-slate-600">Total</p>
+                      <p className="text-lg font-bold text-slate-700">{totalCount}</p>
+                    </div>
+                  )}
+                </div>
+                {(searchQuery || typeFilter !== 'all' || statusFilter !== 'all') && (
+                  <button
+                    onClick={() => {
+                      setSearchQuery('')
+                      setTypeFilter('all')
+                      setStatusFilter('all')
+                      setSortKey('date')
+                      setSortDir('desc')
+                    }}
+                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:border-slate-400 transition"
+                  >
+                    🔄 Reset
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <TransactionsTable rows={processedRows} rid={rid} onSelect={setSelected} selectedKey={selected?.rowKey} />
       </TableShell>
       {selected ? (
         <DetailPanel
@@ -326,12 +549,173 @@ export function UtilizationsTab({
       null,
     )
 
+  // ============================================
+  // SEARCH, SORT, FILTER STATES
+  // ============================================
+  const [searchQuery, setSearchQuery] = useState('')
+  const [sortKey, setSortKey] = useState<'utilization_date' | 'utilized_area' | 'status'>('utilization_date')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+  const [statusFilter, setStatusFilter] = useState<string>('all')
+
+  // ============================================
+  // EXTRACT FILTER OPTIONS
+  // ============================================
+  const uniqueStatuses = useMemo(
+    () => Array.from(new Set(rows.map((r) => r.status).filter(Boolean))).sort(),
+    [rows],
+  )
+
+  // ============================================
+  // APPLY SEARCH, FILTER, SORT
+  // ============================================
+  const processedRows = useMemo(() => {
+    let filtered = rows.filter((row) => {
+      // Search
+      if (searchQuery.trim()) {
+        if (!searchInObject(row as Record<string, unknown>, searchQuery)) return false
+      }
+      // Status filter
+      if (statusFilter !== 'all' && row.status !== statusFilter) return false
+      return true
+    })
+
+    // Sort
+    filtered.sort((a, b) => {
+      let aVal: string | number | Date = ''
+      let bVal: string | number | Date = ''
+
+      switch (sortKey) {
+        case 'utilization_date':
+          aVal = parseDate(a.utilization_date as string) || new Date(0)
+          bVal = parseDate(b.utilization_date as string) || new Date(0)
+          break
+        case 'utilized_area':
+          aVal = a.utilized_area || 0
+          bVal = b.utilized_area || 0
+          break
+        case 'status':
+          aVal = a.status || ''
+          bVal = b.status || ''
+          break
+        default:
+          return 0
+      }
+
+      if (aVal < bVal) return sortDir === 'asc' ? -1 : 1
+      if (aVal > bVal) return sortDir === 'asc' ? 1 : -1
+      return 0
+    })
+
+    return filtered
+  }, [rows, searchQuery, statusFilter, sortKey, sortDir])
+
+  const totalCount = rows.length
+  const filteredCount = processedRows.length
+
   return (
     <>
       <TableShell
         title="Utilizations"
         count={rows.length}
       >
+        {/* FILTER CONTROLS ROW */}
+        <div className="border-b border-slate-200 bg-gradient-to-r from-slate-50 to-blue-50 px-5 py-4">
+          <div className="space-y-4">
+            {/* Row 1: Search */}
+            <div>
+              <label className="mb-2 block text-xs font-semibold text-slate-700 uppercase tracking-wide">Search</label>
+              <div className="relative">
+                <svg className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search across all fields..."
+                  className="w-full rounded-lg border border-slate-300 bg-white pl-10 pr-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 transition"
+                />
+              </div>
+            </div>
+
+            {/* Row 2: Filters */}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              {/* Status Filter */}
+              <div>
+                <label className="mb-2 block text-xs font-semibold text-slate-700 uppercase tracking-wide">Status</label>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 transition"
+                >
+                  <option value="all">All Status</option>
+                  {uniqueStatuses.map((status) => (
+                    <option key={status} value={status}>
+                      {status}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Sort By */}
+              <div>
+                <label className="mb-2 block text-xs font-semibold text-slate-700 uppercase tracking-wide">Sort By</label>
+                <select
+                  value={sortKey}
+                  onChange={(e) => setSortKey(e.target.value as 'utilization_date' | 'utilized_area' | 'status')}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 transition"
+                >
+                  <option value="utilization_date">Date</option>
+                  <option value="utilized_area">Area</option>
+                  <option value="status">Status</option>
+                </select>
+              </div>
+
+              {/* Sort Order */}
+              <div>
+                <label className="mb-2 block text-xs font-semibold text-slate-700 uppercase tracking-wide">Order</label>
+                <select
+                  value={sortDir}
+                  onChange={(e) => setSortDir(e.target.value as 'asc' | 'desc')}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 transition"
+                >
+                  <option value="desc">Descending ↓</option>
+                  <option value="asc">Ascending ↑</option>
+                </select>
+              </div>
+
+              {/* Statistics + Reset */}
+              <div className="flex flex-col gap-2 sm:col-span-2 lg:col-span-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="rounded-lg border border-blue-200 bg-blue-50 px-2 py-2.5">
+                    <p className="text-[10px] font-semibold uppercase text-blue-600">Showing</p>
+                    <p className="text-lg font-bold text-blue-900">{filteredCount}</p>
+                  </div>
+                  {(searchQuery || statusFilter !== 'all') && (
+                    <div className="rounded-lg border border-slate-200 bg-slate-100 px-2 py-2.5">
+                      <p className="text-[10px] font-semibold uppercase text-slate-600">Total</p>
+                      <p className="text-lg font-bold text-slate-700">{totalCount}</p>
+                    </div>
+                  )}
+                </div>
+                {(searchQuery || statusFilter !== 'all') && (
+                  <button
+                    onClick={() => {
+                      setSearchQuery('')
+                      setStatusFilter('all')
+                      setSortKey('utilization_date')
+                      setSortDir('desc')
+                    }}
+                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:border-slate-400 transition"
+                  >
+                    🔄 Reset
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
         <table className="w-full min-w-[1300px]">
           <thead>
             <tr>
@@ -378,17 +762,19 @@ export function UtilizationsTab({
           </thead>
 
           <tbody>
-            {rows.length === 0 ? (
+            {processedRows.length === 0 ? (
               <tr>
                 <td
                   colSpan={10}
                   className={`${tdClass} text-center text-[#8c9ab5]`}
                 >
-                  No utilization records.
+                  {searchQuery || statusFilter !== 'all'
+                    ? 'No utilization records match your filters.'
+                    : 'No utilization records.'}
                 </td>
               </tr>
             ) : (
-              rows.map((row, index) => (
+              processedRows.map((row, index) => (
                 <ClickableRow
                   key={row.rowKey}
                   active={
@@ -513,12 +899,173 @@ export function TransfersTab({ historyData, rid }: TabPanelsProps) {
   const [selected, setSelected] =
     useState<FlatTransferRow | null>(null)
 
+  // ============================================
+  // SEARCH, SORT, FILTER STATES
+  // ============================================
+  const [searchQuery, setSearchQuery] = useState('')
+  const [sortKey, setSortKey] = useState<'trn_date' | 'transferred_area' | 'status'>('trn_date')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+  const [statusFilter, setStatusFilter] = useState<string>('all')
+
+  // ============================================
+  // EXTRACT FILTER OPTIONS
+  // ============================================
+  const uniqueStatuses = useMemo(
+    () => Array.from(new Set(rows.map((r) => r.status).filter(Boolean))).sort(),
+    [rows],
+  )
+
+  // ============================================
+  // APPLY SEARCH, FILTER, SORT
+  // ============================================
+  const processedRows = useMemo(() => {
+    let filtered = rows.filter((row) => {
+      // Search
+      if (searchQuery.trim()) {
+        if (!searchInObject(row as Record<string, unknown>, searchQuery)) return false
+      }
+      // Status filter
+      if (statusFilter !== 'all' && row.status !== statusFilter) return false
+      return true
+    })
+
+    // Sort
+    filtered.sort((a, b) => {
+      let aVal: string | number | Date = ''
+      let bVal: string | number | Date = ''
+
+      switch (sortKey) {
+        case 'trn_date':
+          aVal = parseDate(a.trn_date as string) || new Date(0)
+          bVal = parseDate(b.trn_date as string) || new Date(0)
+          break
+        case 'transferred_area':
+          aVal = a.transferred_area || 0
+          bVal = b.transferred_area || 0
+          break
+        case 'status':
+          aVal = a.status || ''
+          bVal = b.status || ''
+          break
+        default:
+          return 0
+      }
+
+      if (aVal < bVal) return sortDir === 'asc' ? -1 : 1
+      if (aVal > bVal) return sortDir === 'asc' ? 1 : -1
+      return 0
+    })
+
+    return filtered
+  }, [rows, searchQuery, statusFilter, sortKey, sortDir])
+
+  const totalCount = rows.length
+  const filteredCount = processedRows.length
+
   return (
     <>
       <TableShell
         title="Transfers"
         count={rows.length}
       >
+        {/* FILTER CONTROLS ROW */}
+        <div className="border-b border-slate-200 bg-gradient-to-r from-slate-50 to-blue-50 px-5 py-4">
+          <div className="space-y-4">
+            {/* Row 1: Search */}
+            <div>
+              <label className="mb-2 block text-xs font-semibold text-slate-700 uppercase tracking-wide">Search</label>
+              <div className="relative">
+                <svg className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search across all fields..."
+                  className="w-full rounded-lg border border-slate-300 bg-white pl-10 pr-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 transition"
+                />
+              </div>
+            </div>
+
+            {/* Row 2: Filters */}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              {/* Status Filter */}
+              <div>
+                <label className="mb-2 block text-xs font-semibold text-slate-700 uppercase tracking-wide">Status</label>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 transition"
+                >
+                  <option value="all">All Status</option>
+                  {uniqueStatuses.map((status) => (
+                    <option key={status} value={status}>
+                      {status}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Sort By */}
+              <div>
+                <label className="mb-2 block text-xs font-semibold text-slate-700 uppercase tracking-wide">Sort By</label>
+                <select
+                  value={sortKey}
+                  onChange={(e) => setSortKey(e.target.value as 'trn_date' | 'transferred_area' | 'status')}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 transition"
+                >
+                  <option value="trn_date">Date</option>
+                  <option value="transferred_area">Area</option>
+                  <option value="status">Status</option>
+                </select>
+              </div>
+
+              {/* Sort Order */}
+              <div>
+                <label className="mb-2 block text-xs font-semibold text-slate-700 uppercase tracking-wide">Order</label>
+                <select
+                  value={sortDir}
+                  onChange={(e) => setSortDir(e.target.value as 'asc' | 'desc')}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 transition"
+                >
+                  <option value="desc">Descending ↓</option>
+                  <option value="asc">Ascending ↑</option>
+                </select>
+              </div>
+
+              {/* Statistics + Reset */}
+              <div className="flex flex-col gap-2 sm:col-span-2 lg:col-span-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="rounded-lg border border-blue-200 bg-blue-50 px-2 py-2.5">
+                    <p className="text-[10px] font-semibold uppercase text-blue-600">Showing</p>
+                    <p className="text-lg font-bold text-blue-900">{filteredCount}</p>
+                  </div>
+                  {(searchQuery || statusFilter !== 'all') && (
+                    <div className="rounded-lg border border-slate-200 bg-slate-100 px-2 py-2.5">
+                      <p className="text-[10px] font-semibold uppercase text-slate-600">Total</p>
+                      <p className="text-lg font-bold text-slate-700">{totalCount}</p>
+                    </div>
+                  )}
+                </div>
+                {(searchQuery || statusFilter !== 'all') && (
+                  <button
+                    onClick={() => {
+                      setSearchQuery('')
+                      setStatusFilter('all')
+                      setSortKey('trn_date')
+                      setSortDir('desc')
+                    }}
+                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:border-slate-400 transition"
+                  >
+                    🔄 Reset
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
         <table className="w-full min-w-[1350px]">
           <thead>
             <tr>
@@ -547,17 +1094,19 @@ export function TransfersTab({ historyData, rid }: TabPanelsProps) {
           </thead>
 
           <tbody>
-            {rows.length === 0 ? (
+            {processedRows.length === 0 ? (
               <tr>
                 <td
                   colSpan={11}
                   className={`${tdClass} text-center text-[#8c9ab5]`}
                 >
-                  No transfer records.
+                  {searchQuery || statusFilter !== 'all'
+                    ? 'No transfer records match your filters.'
+                    : 'No transfer records.'}
                 </td>
               </tr>
             ) : (
-              rows.map((row, index) => (
+              processedRows.map((row, index) => (
                 <ClickableRow
                   key={row.rowKey}
                   active={
@@ -705,12 +1254,139 @@ export function LedgerTab({
       null,
     )
 
+  // ============================================
+  // SEARCH, SORT, FILTER STATES
+  // ============================================
+  const [searchQuery, setSearchQuery] = useState('')
+  const [sortKey, setSortKey] = useState<'createdAt' | 'action'>('createdAt')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+
+  // ============================================
+  // APPLY SEARCH, SORT
+  // ============================================
+  const processedRows = useMemo(() => {
+    let filtered = rows.filter((row) => {
+      // Search
+      if (searchQuery.trim()) {
+        if (!searchInObject(row as Record<string, unknown>, searchQuery)) return false
+      }
+      return true
+    })
+
+    // Sort
+    filtered.sort((a, b) => {
+      let aVal: string | number | Date = ''
+      let bVal: string | number | Date = ''
+
+      switch (sortKey) {
+        case 'createdAt':
+          aVal = parseDate(a.createdAt as string) || new Date(0)
+          bVal = parseDate(b.createdAt as string) || new Date(0)
+          break
+        case 'action':
+          aVal = a.action || ''
+          bVal = b.action || ''
+          break
+        default:
+          return 0
+      }
+
+      if (aVal < bVal) return sortDir === 'asc' ? -1 : 1
+      if (aVal > bVal) return sortDir === 'asc' ? 1 : -1
+      return 0
+    })
+
+    return filtered
+  }, [rows, searchQuery, sortKey, sortDir])
+
+  const totalCount = rows.length
+  const filteredCount = processedRows.length
+
   return (
     <>
       <TableShell
         title="Ledger (MongoDB)"
         count={rows.length}
       >
+        {/* FILTER CONTROLS ROW */}
+        <div className="border-b border-slate-200 bg-gradient-to-r from-slate-50 to-blue-50 px-5 py-4">
+          <div className="space-y-4">
+            {/* Row 1: Search */}
+            <div>
+              <label className="mb-2 block text-xs font-semibold text-slate-700 uppercase tracking-wide">Search</label>
+              <div className="relative">
+                <svg className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search across all fields..."
+                  className="w-full rounded-lg border border-slate-300 bg-white pl-10 pr-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 transition"
+                />
+              </div>
+            </div>
+
+            {/* Row 2: Sort Controls */}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              {/* Sort By */}
+              <div>
+                <label className="mb-2 block text-xs font-semibold text-slate-700 uppercase tracking-wide">Sort By</label>
+                <select
+                  value={sortKey}
+                  onChange={(e) => setSortKey(e.target.value as 'createdAt' | 'action')}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 transition"
+                >
+                  <option value="createdAt">Date</option>
+                  <option value="action">Action</option>
+                </select>
+              </div>
+
+              {/* Sort Order */}
+              <div>
+                <label className="mb-2 block text-xs font-semibold text-slate-700 uppercase tracking-wide">Order</label>
+                <select
+                  value={sortDir}
+                  onChange={(e) => setSortDir(e.target.value as 'asc' | 'desc')}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 transition"
+                >
+                  <option value="desc">Descending ↓</option>
+                  <option value="asc">Ascending ↑</option>
+                </select>
+              </div>
+
+              {/* Statistics + Reset */}
+              <div className="flex flex-col gap-2 sm:col-span-2 lg:col-span-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="rounded-lg border border-blue-200 bg-blue-50 px-2 py-2.5">
+                    <p className="text-[10px] font-semibold uppercase text-blue-600">Showing</p>
+                    <p className="text-lg font-bold text-blue-900">{filteredCount}</p>
+                  </div>
+                  {searchQuery && (
+                    <div className="rounded-lg border border-slate-200 bg-slate-100 px-2 py-2.5">
+                      <p className="text-[10px] font-semibold uppercase text-slate-600">Total</p>
+                      <p className="text-lg font-bold text-slate-700">{totalCount}</p>
+                    </div>
+                  )}
+                </div>
+                {searchQuery && (
+                  <button
+                    onClick={() => {
+                      setSearchQuery('')
+                      setSortKey('createdAt')
+                      setSortDir('desc')
+                    }}
+                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:border-slate-400 transition"
+                  >
+                    🔄 Reset
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
         <table className="w-full min-w-[1350px]">
           <thead>
             <tr>
@@ -753,17 +1429,19 @@ export function LedgerTab({
           </thead>
 
           <tbody>
-            {rows.length === 0 ? (
+            {processedRows.length === 0 ? (
               <tr>
                 <td
                   colSpan={9}
                   className={`${tdClass} text-center text-[#8c9ab5]`}
                 >
-                  No ledger entries.
+                  {searchQuery
+                    ? 'No ledger entries match your search.'
+                    : 'No ledger entries.'}
                 </td>
               </tr>
             ) : (
-              rows.map(
+              processedRows.map(
                 (row, index) => (
                   <ClickableRow
                     key={row.rowKey}
@@ -895,8 +1573,7 @@ function TransactionsTable({
           <th className={thClass}>Type</th>
           <th className={thClass}>Reference ID</th>
           <th className={thClass}>Application</th>
-          <th className={thClass}>Amount (TDR)</th>
-          <th className={thClass}>Area</th>
+          <th className={thClass}>Area (sq.m)</th>
           <th className={thClass}>Counterparty / Purpose</th>
           <th className={thClass}>Date</th>
           <th className={thClass}>Status</th>
@@ -939,8 +1616,7 @@ function TransactionsTable({
               <td className={tdClass}>
                 <AppLink applicationId={row.application_id} samagraId={row.samagra_id} rid={rid} />
               </td>
-              <td className={tdClass}>₹ {n(row.amountTdr)}</td>
-              <td className={tdClass}>{n(row.area)}</td>
+              <td className={tdClass}>{n(row.area)} sq.m </td>
               <td className={tdClass}>
                 {row.txType === 'UTILIZATION' ? row.purpose : row.counterparty}
               </td>

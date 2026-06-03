@@ -9,7 +9,7 @@ import {
   type SortingState,
 } from '@tanstack/react-table'
 import { useMemo, useState } from 'react'
-import { d, n, statusBadge } from './helpers'
+import { d, statusBadge } from './helpers'
 import type { TransferRow, UtilizationRow } from './types'
 
 // ======================================================
@@ -126,9 +126,9 @@ function DataTable<T extends object>({
                     {header.isPlaceholder
                       ? null
                       : flexRender(
-                          header.column.columnDef.header,
-                          header.getContext(),
-                        )}
+                        header.column.columnDef.header,
+                        header.getContext(),
+                      )}
                   </th>
                 ))}
               </tr>
@@ -152,10 +152,9 @@ function DataTable<T extends object>({
                   className={`
                     transition-all duration-200
                     hover:bg-blue-50/60
-                    ${
-                      index % 2 === 0
-                        ? 'bg-white'
-                        : 'bg-slate-50/40'
+                    ${index % 2 === 0
+                      ? 'bg-white'
+                      : 'bg-slate-50/40'
                     }
                   `}
                 >
@@ -234,32 +233,32 @@ export function TransfersTable({
         ),
       }) as ColumnDef<TransferRow, unknown>,
 
-      columnHelper.accessor('transferValue', {
-        header: 'Transfer Value',
-        cell: (info) => (
-          <span className="font-bold text-emerald-600">
-            {n(info.getValue())}
-          </span>
-        ),
-      }) as ColumnDef<TransferRow, unknown>,
+      // columnHelper.accessor('transferValue', {
+      //   header: 'Transfer Value',
+      //   cell: (info) => (
+      //     <span className="font-bold text-emerald-600">
+      //       {n(info.getValue())}
+      //     </span>
+      //   ),
+      // }) as ColumnDef<TransferRow, unknown>,
 
-      columnHelper.accessor('beforeBalance', {
-        header: 'Before Balance',
-        cell: (info) => (
-          <span className="font-bold text-blue-700">
-            {n(info.getValue())}
-          </span>
-        ),
-      }) as ColumnDef<TransferRow, unknown>,
+      // columnHelper.accessor('beforeBalance', {
+      //   header: 'Before Balance',
+      //   cell: (info) => (
+      //     <span className="font-bold text-blue-700">
+      //       {n(info.getValue())}
+      //     </span>
+      //   ),
+      // }) as ColumnDef<TransferRow, unknown>,
 
-      columnHelper.accessor('remaining', {
-        header: 'Remaining',
-        cell: (info) => (
-          <span className="font-bold text-indigo-700">
-            {n(info.getValue())}
-          </span>
-        ),
-      }) as ColumnDef<TransferRow, unknown>,
+      // columnHelper.accessor('remaining', {
+      //   header: 'Remaining',
+      //   cell: (info) => (
+      //     <span className="font-bold text-indigo-700">
+      //       {n(info.getValue())}
+      //     </span>
+      //   ),
+      // }) as ColumnDef<TransferRow, unknown>,
 
       columnHelper.accessor(
         'beforeTransferAreaSqM',
@@ -337,8 +336,8 @@ export function TransfersTable({
               text-[11px] font-bold
               ring-1
               ${statusBadge(
-                info.getValue(),
-              )}
+              info.getValue(),
+            )}
             `}
           >
             {info.getValue() ?? '-'}
@@ -380,17 +379,17 @@ export function UtilizationsTable({
   >(
     () =>
       [
-         columnHelper.display({
-        id: 'srNo',
+        columnHelper.display({
+          id: 'srNo',
 
-        header: 'SR. No.',
+          header: 'SR. No.',
 
-        cell: (info) => (
-          <span className="font-bold text-slate-700">
-            {info.row.index + 1}
-          </span>
-        ),
-      }),
+          cell: (info) => (
+            <span className="font-bold text-slate-700">
+              {info.row.index + 1}
+            </span>
+          ),
+        }),
         columnHelper.accessor(
           'utilizationId',
           {
@@ -412,41 +411,41 @@ export function UtilizationsTable({
           ),
         }),
 
-        columnHelper.accessor(
-          'utilizedValue',
-          {
-            header: 'Utilized Value',
-            cell: (info) => (
-              <span className="font-bold text-emerald-600">
-                {n(info.getValue())}
-              </span>
-            ),
-          },
-        ),
+        // columnHelper.accessor(
+        //   'utilizedValue',
+        //   {
+        //     header: 'Utilized Value',
+        //     cell: (info) => (
+        //       <span className="font-bold text-emerald-600">
+        //         {n(info.getValue())}
+        //       </span>
+        //     ),
+        //   },
+        // ),
 
-        columnHelper.accessor(
-          'beforeBalance',
-          {
-            header: 'Before Balance',
-            cell: (info) => (
-              <span className="font-bold text-blue-700">
-                {n(info.getValue())}
-              </span>
-            ),
-          },
-        ),
+        // columnHelper.accessor(
+        //   'beforeBalance',
+        //   {
+        //     header: 'Before Balance',
+        //     cell: (info) => (
+        //       <span className="font-bold text-blue-700">
+        //         {n(info.getValue())}
+        //       </span>
+        //     ),
+        //   },
+        // ),
 
-        columnHelper.accessor(
-          'afterBalance',
-          {
-            header: 'After Balance',
-            cell: (info) => (
-              <span className="font-bold text-indigo-700">
-                {n(info.getValue())}
-              </span>
-            ),
-          },
-        ),
+        // columnHelper.accessor(
+        //   'afterBalance',
+        //   {
+        //     header: 'After Balance',
+        //     cell: (info) => (
+        //       <span className="font-bold text-indigo-700">
+        //         {n(info.getValue())}
+        //       </span>
+        //     ),
+        //   },
+        // ),
 
         columnHelper.accessor(
           'beforeUtilizationAreaSqM',
@@ -455,11 +454,15 @@ export function UtilizationsTable({
             cell: (info) =>
               info.getValue() == null
                 ? '-'
-                : `${info
-                    .getValue()!
-                    .toLocaleString(
-                      'en-IN',
-                    )} sq.m`,
+                : (
+                  <span className="font-semibold text-sky-700">
+                    {`${info
+                      .getValue()!
+                      .toLocaleString(
+                        'en-IN',
+                      )} sq.m`}
+                  </span>
+                ),
           },
         ),
 
@@ -470,11 +473,15 @@ export function UtilizationsTable({
             cell: (info) =>
               info.getValue() == null
                 ? '-'
-                : `${info
-                    .getValue()!
-                    .toLocaleString(
-                      'en-IN',
-                    )} sq.m`,
+                : (
+                  <span className="font-semibold text-orange-600">
+                    {`${info
+                      .getValue()!
+                      .toLocaleString(
+                        'en-IN',
+                      )} sq.m`}
+                  </span>
+                ),
           },
         ),
 
@@ -485,11 +492,15 @@ export function UtilizationsTable({
             cell: (info) =>
               info.getValue() == null
                 ? '-'
-                : `${info
-                    .getValue()!
-                    .toLocaleString(
-                      'en-IN',
-                    )} sq.m`,
+                : (
+              <span className="font-semibold text-emerald-700">
+                {`${info
+                  .getValue()!
+                  .toLocaleString(
+                    'en-IN',
+                  )} sq.m`}
+              </span>
+            ),
           },
         ),
 
@@ -520,8 +531,8 @@ export function UtilizationsTable({
                 text-[11px] font-bold
                 ring-1
                 ${statusBadge(
-                  info.getValue(),
-                )}
+                info.getValue(),
+              )}
               `}
             >
               {info.getValue() ?? '-'}

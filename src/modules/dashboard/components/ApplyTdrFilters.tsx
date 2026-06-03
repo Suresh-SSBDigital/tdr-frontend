@@ -37,10 +37,6 @@ interface ApplyTdrFiltersProps {
 
 export default function ApplyTdrFilters(props: ApplyTdrFiltersProps) {
   const {
-    sortKey,
-    sortDir,
-    setSortKey,
-    setSortDir,
     search,
     setSearch,
     district,
@@ -59,31 +55,11 @@ export default function ApplyTdrFilters(props: ApplyTdrFiltersProps) {
   } = props
 
   return (
-    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-      <div className="lg:col-span-2">
-        <label className="mb-1 block text-xs font-medium text-[#595959]">Sort by</label>
-        <select
-          value={`${sortKey}|${sortDir}`}
-          onChange={(e) => {
-            const [k, d] = e.target.value.split('|') as [ApplySortKey, 'asc' | 'desc']
-            setSortKey(k)
-            setSortDir(d)
-            resetPage()
-          }}
-          className={inputClass}
-        >
-          <option value="appliedOn|desc">Application date (newest)</option>
-          <option value="appliedOn|asc">Application date (oldest)</option>
-          <option value="applicantName|asc">Applicant (A-Z)</option>
-          <option value="tdrValueCr|desc">TDR value (high-low)</option>
-          <option value="transferredTdrValue|desc">Transferred TDR (high-low)</option>
-          <option value="transferredTdrValue|asc">Transferred TDR (low-high)</option>
-          <option value="district|asc">District (A-Z)</option>
-          <option value="status|asc">Status (A-Z)</option>
-        </select>
-      </div>
-      <div className="relative lg:col-span-2 mt-5">
-        <FiSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7da0d9]" />
+    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7">
+      <div className="relative lg:col-span-2">
+        <label className="mb-1 block text-xs font-medium text-[#595959]">Search</label>
+
+        <FiSearch className="pointer-events-none mt-2 absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7da0d9]" />
         <input
           value={search}
           onChange={(e) => {

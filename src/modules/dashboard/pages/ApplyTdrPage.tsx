@@ -103,20 +103,6 @@ export default function ApplyTdrPage() {
             : `${USER_ROLE_LABELS[role]} · search, filter, and open applications for review at your workflow tier.`
         }
       />
-
-      <div className="rounded-lg border border-[#adc6ff] bg-gradient-to-r from-[#e6f4ff] to-[#f0f5ff] px-4 py-2.5 text-sm text-[#1f2d3d]">
-        {readOnlyPortal ? (
-          <>
-            <strong>View only</strong> — use filters below and <strong>View details</strong> to inspect an application.
-          </>
-        ) : (
-          <>
-            <strong>Workflow access</strong> — search and open applications per your TCP tier; approvals remain within
-            gazette-prescribed gates on officer routes.
-          </>
-        )}
-      </div>
-
       <section className={`${cardClass} space-y-4`}>
         <ApplyTdrFilters
           sortKey={sortKey}
@@ -139,12 +125,13 @@ export default function ApplyTdrPage() {
           tehsils={tehsils}
           resetPage={() => setPage(1)}
         />
-
-        <p className="text-xs text-[#597393]">
-          {filtered.length} application{filtered.length === 1 ? '' : 's'} match filters · Sort & pagination below
-        </p>
-
-        <ApplyTdrTable rows={pageRows} sortKey={sortKey} sortDir={sortDir} onToggleSort={toggleSort} />
+        <ApplyTdrTable
+          rows={pageRows}
+          totalRecords={sorted.length}
+          sortKey={sortKey}
+          sortDir={sortDir}
+          onToggleSort={toggleSort}
+        />
         <ApplyTdrPagination pageSize={pageSize} setPageSize={setPageSize} page={page} totalPages={totalPages} setPage={setPage} />
       </section>
     </div>

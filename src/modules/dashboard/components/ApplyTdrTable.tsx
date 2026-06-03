@@ -26,8 +26,8 @@ import type { ApplySortKey } from './ApplyTdrFilters'
 
 const COLUMN_WIDTHS_PX = [
   90, // SR No.
-  180, 140, 180, 120, 120, 150, 150, 150,
-  150, 150, 150, 150, 130, 160, 100,
+  180, 140, 180, 120, 120, 180, 150, 150,
+  150, 150, 150,
 ] as const
 
 
@@ -99,10 +99,12 @@ function buildTxQuery(a: TdrApplicationRecord) {
 
 interface ApplyTdrTableProps {
   rows: TdrApplicationRecord[]
+  totalRecords: number
   sortKey: ApplySortKey
   sortDir: 'asc' | 'desc'
   onToggleSort: (key: ApplySortKey) => void
 }
+
 
 /* =========================================================
    MAIN COMPONENT
@@ -111,9 +113,11 @@ interface ApplyTdrTableProps {
 export default function ApplyTdrTable({
   rows,
   sortKey,
+  totalRecords,
   sortDir,
   onToggleSort,
 }: ApplyTdrTableProps) {
+
   const columns = useMemo(
     () => [
       columnHelper.display({
@@ -154,7 +158,7 @@ export default function ApplyTdrTable({
       }),
 
       columnHelper.accessor('samagraId', {
-        header: 'TDR App ID',
+        header: 'Samagra ID',
 
         cell: ({ getValue }) => (
           <div className="whitespace-normal break-all font-mono text-xs text-slate-700">
@@ -256,78 +260,78 @@ export default function ApplyTdrTable({
         ),
       }),
 
-      columnHelper.accessor('tdrValueCr', {
-        header: () => (
-          <button
-            type="button"
-            onClick={() =>
-              onToggleSort('tdrValueCr')
-            }
-            className="flex items-center gap-1 font-semibold"
-          >
-            Total TDR value
+      // columnHelper.accessor('tdrValueCr', {
+      //   header: () => (
+      //     <button
+      //       type="button"
+      //       onClick={() =>
+      //         onToggleSort('tdrValueCr')
+      //       }
+      //       className="flex items-center gap-1 font-semibold"
+      //     >
+      //       Total TDR value
 
-            <SortIcon
-              active={
-                sortKey === 'tdrValueCr'
-              }
-              dir={sortDir}
-            />
-          </button>
-        ),
+      //       <SortIcon
+      //         active={
+      //           sortKey === 'tdrValueCr'
+      //         }
+      //         dir={sortDir}
+      //       />
+      //     </button>
+      //   ),
 
-        cell: ({ getValue }) => (
-          <span className="tabular-nums font-semibold text-blue-700">
-            ₹{' '}
-            {getValue().toLocaleString('en-IN')}
-          </span>
-        ),
-      }),
+      //   cell: ({ getValue }) => (
+      //     <span className="tabular-nums font-semibold text-blue-700">
+      //       ₹{' '}
+      //       {getValue().toLocaleString('en-IN')}
+      //     </span>
+      //   ),
+      // }),
 
-      columnHelper.display({
-        id: 'transferredTdr',
+      // columnHelper.display({
+      //   id: 'transferredTdr',
 
-        header: 'Transferred TDR',
+      //   header: 'Transferred TDR',
 
-        cell: ({ row }) => (
-          <span className="tabular-nums text-orange-600">
-            {(
-              row.original.transferredTdrValue ??
-              0
-            ).toLocaleString('en-IN')}
-          </span>
-        ),
-      }),
+      //   cell: ({ row }) => (
+      //     <span className="tabular-nums text-orange-600">
+      //       {(
+      //         row.original.transferredTdrValue ??
+      //         0
+      //       ).toLocaleString('en-IN')}
+      //     </span>
+      //   ),
+      // }),
 
-      columnHelper.display({
-        id: 'utilizedTdr',
+      // columnHelper.display({
+      //   id: 'utilizedTdr',
 
-        header: 'Utilized TDR',
+      //   header: 'Utilized TDR',
 
-        cell: ({ row }) => (
-          <span className="tabular-nums text-violet-700">
-            {(
-              row.original.utilizedTdrValue ??
-              0
-            ).toLocaleString('en-IN')}
-          </span>
-        ),
-      }),
+      //   cell: ({ row }) => (
+      //     <span className="tabular-nums text-violet-700">
+      //       {(
+      //         row.original.utilizedTdrValue ??
+      //         0
+      //       ).toLocaleString('en-IN')}
+      //     </span>
+      //   ),
+      // }),
 
-      columnHelper.display({
-        id: 'remainingTdr',
+      // columnHelper.display({
+      //   id: 'remainingTdr',
 
-        header: 'Remaining TDR',
+      //   header: 'Remaining TDR',
 
-        cell: ({ row }) => (
-          <span className="tabular-nums font-bold text-emerald-700">
-            {(
-              row.original.remainingTdrValue ??
-              0
-            ).toLocaleString('en-IN')}
-          </span>
-        ),
-      }),
+      //   cell: ({ row }) => (
+      //     <span className="tabular-nums font-bold text-emerald-700">
+      //       {(
+      //         row.original.remainingTdrValue ??
+      //         0
+      //       ).toLocaleString('en-IN')}
+      //     </span>
+      //   ),
+      // }),
 
       columnHelper.accessor('status', {
         header: () => (
@@ -423,57 +427,55 @@ export default function ApplyTdrTable({
 
       {/* HEADER */}
 
-      <div className="border-b border-slate-200 bg-gradient-to-r from-[#0f172b] via-[#1e40af] to-[#312e81] px-6 py-5">
-        <div className="flex flex-wrap items-center justify-between gap-4">
+     <div className="border-b border-slate-300 bg-white px-6 py-5 shadow-sm">
+  <div className="flex flex-wrap items-center justify-between gap-4">
 
-          <div>
-            <h2 className="text-xl font-bold tracking-wide text-white">
-              TDR Applications
-            </h2>
+    <div>
+      <h2 className="text-xl font-bold tracking-wide text-slate-800">
+        TDR Applications
+      </h2>
 
-            <p className="mt-1 text-sm text-blue-100">
-              Manage all TDR applications &
-              transactions
-            </p>
-          </div>
+      <p className="mt-1 text-sm text-slate-600">
+        Manage all TDR applications & transactions
+      </p>
+    </div>
 
-          <div
-            className="
-    flex items-center gap-3
-    rounded-2xl
-    border border-white/10
-    bg-white/10
-    px-4 py-2
-    backdrop-blur-md
-    shadow-lg
-  "
-          >
-            <p
-              className="
-      text-[11px]
-      font-semibold
-      uppercase
-      tracking-[2px]
-      text-blue-100
-      whitespace-nowrap
-    "
-            >
-              Total Records
-            </p>
+    <div
+      className="
+        flex items-center gap-3
+        rounded-xl
+        border border-blue-200
+        bg-blue-50
+        px-4 py-2
+      "
+    >
+      <p
+        className="
+          text-[11px]
+          font-semibold
+          uppercase
+          tracking-[2px]
+          text-blue-700
+          whitespace-nowrap
+        "
+      >
+        Total Records
+      </p>
 
-            <p
-              className="
-      text-2xl
-      font-bold
-      leading-none
-      text-white
-    "
-            >
-              {rows.length}
-            </p>
-          </div>
-        </div>
-      </div>
+      <p
+        className="
+          text-2xl
+          font-bold
+          leading-none
+          text-blue-900
+        "
+      >
+        {totalRecords}
+      </p>
+    </div>
+
+  </div>
+</div>
 
       {/* TABLE */}
 

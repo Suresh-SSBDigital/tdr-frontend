@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
-import { FiArrowLeft, FiCalendar, FiCheckCircle, FiCopy, FiDownload, FiFileText, FiSend, FiUsers } from 'react-icons/fi'
-import { HiOutlineCurrencyRupee } from 'react-icons/hi2'
+import { FiArrowLeft, FiCopy, FiDownload, FiFileText, FiMap, FiCheckCircle } from 'react-icons/fi'
 import { TbTopologyStar3 } from 'react-icons/tb'
 import type { ReactFlowInstance } from '@xyflow/react'
 import { apiUrl } from '../../../api/http'
@@ -23,36 +22,11 @@ import TreeTab from './totalHistory/TreeTab'
 
 const API_KEY = (import.meta.env.VITE_API_KEY ?? '').trim()
 
-function formatDateTime(v?: string) {
-  if (!v) return '—'
-  const dt = new Date(v)
-  if (Number.isNaN(dt.getTime())) return v
-  return dt.toLocaleDateString('en-IN', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
-
 function TabBadge({ count }: { count: number }) {
   return (
     <span className="rounded-full bg-[#f0f5ff] px-1.5 py-0.5 text-[10px] font-bold text-[#1890ff]">
       {count}
     </span>
-  )
-}
-
-function MetaChip({ label, value, icon }: { label: string; value: string; icon: React.ReactNode }) {
-  return (
-    <div className="flex items-center gap-2 rounded-lg border border-[#eef2f7] bg-white px-3 py-1.5 shadow-sm">
-      <span className="text-lg text-[#1890ff]">{icon}</span>
-      <div>
-        <p className="text-[10px] font-bold uppercase text-[#8c9ab5]">{label}</p>
-        <p className="font-mono text-xs font-bold text-[#1c2b4a]">{value}</p>
-      </div>
-    </div>
   )
 }
 
@@ -83,30 +57,6 @@ function KpiCard({
   )
 }
 
-function StatusTile({
-  label,
-  value,
-  tone,
-}: {
-  label: string
-  value: string
-  tone: 'success' | 'warning' | 'danger' | 'muted'
-}) {
-  const toneClasses = {
-    success: 'border-[#b7eb8f] bg-[#f6ffed] text-[#389e0d]',
-    warning: 'border-[#ffe7ba] bg-[#fff7e6] text-[#d46b08]',
-    danger: 'border-[#ffa39e] bg-[#fff1f0] text-[#cf1322]',
-    muted: 'border-[#d6e4ff] bg-[#f5f7ff] text-[#1c2b4a]',
-  }
-
-  return (
-    <div className={`rounded-2xl border px-4 py-3 ${toneClasses[tone]}`}>
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-[#475569]">{label}</p>
-      <p className="mt-2 text-lg font-bold">{value}</p>
-    </div>
-  )
-}
-
 function parseTab(value: string | null): RidHistoryTabId {
   const valid: RidHistoryTabId[] = ['overview', 'tree', 'all', 'utilizations', 'transfers', 'ledger']
   if (value && valid.includes(value as RidHistoryTabId)) return value as RidHistoryTabId
@@ -126,12 +76,12 @@ export default function TotalHistoryTreePage() {
   const [rfApi, setRfApi] = useState<Pick<ReactFlowInstance, 'fitView' | 'zoomIn' | 'zoomOut'> | null>(
     null,
   )
-  const [searchTerm, setSearchTerm] = useState('')
-  const [ownerFilter, setOwnerFilter] = useState('')
-  const [transactionFilter, setTransactionFilter] = useState<'all' | 'transfer' | 'utilization'>('all')
-  const [statusFilter, setStatusFilter] = useState<'all' | 'created' | 'pending' | 'verified' | 'tampered'>('all')
-  const [dateFrom, setDateFrom] = useState('')
-  const [dateTo, setDateTo] = useState('')
+  const [searchTerm] = useState('')
+  const [ownerFilter] = useState('')
+  const [transactionFilter] = useState<'all' | 'transfer' | 'utilization'>('all')
+  const [statusFilter] = useState<'all' | 'created' | 'pending' | 'verified' | 'tampered'>('all')
+  const [dateFrom] = useState('')
+  const [dateTo] = useState('')
 
   const normalizeSearch = (value?: string | number) => String(value ?? '').trim().toLowerCase()
 
@@ -200,8 +150,6 @@ export default function TotalHistoryTreePage() {
     filteredHistoryData?.applications?.filter((app) => (app.mongo_ledger?.length ?? 0) === 0).length ?? 0
 
   const syncStatus = historyData ? 'Live' : 'Pending'
-  const syncTone = historyData ? 'success' : 'warning'
-
   const setTab = useCallback(
     (tab: RidHistoryTabId) => {
       const next = new URLSearchParams(searchParams)
@@ -268,10 +216,6 @@ export default function TotalHistoryTreePage() {
     displayApp?.samagra_id?.trim() || searchParams.get('samagra_id')?.trim() || '—'
   const displayOwner = displayApp?.owner_name ?? '—'
   const displayStatus = displayApp?.status ?? '—'
-  const displayTotalTdr =
-    displayApp?.total_tdr_value != null ? `₹ ${n(displayApp.total_tdr_value)}` : '—'
-  const displayRemainingTdr =
-    displayApp?.remaining_tdr_value != null ? `₹ ${n(displayApp.remaining_tdr_value)}` : '—'
   const displayArea = displayApp?.total_area != null ? n(displayApp.total_area) : '—'
 
   const handleFit = useCallback(() => {
@@ -285,242 +229,153 @@ export default function TotalHistoryTreePage() {
 
   return (
     <div className="space-y-0 pb-4">
-      <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_10px_40px_-12px_rgba(15,23,42,0.18)]">
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+
         {/* HEADER */}
-        <div className="border-b border-slate-200 bg-gradient-to-r from-[#0f172a] via-[#1e40af] to-[#312e81] px-6 py-5">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[2px] text-blue-100">TDR Total History</p>
-              <h1 className="mt-1 text-xl font-bold tracking-wide text-white">Application Overview</h1>
-              <p className="mt-1 text-sm text-blue-100">Manage RID history & related transaction timeline</p>
-            </div>
-
-            <Link
-              to="/dashboard/apply"
-              className="inline-flex items-center gap-1 rounded-2xl border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-blue-100 backdrop-blur-md shadow-lg transition hover:bg-white/20"
-            >
-              <FiArrowLeft /> Back to Applications
-            </Link>
-          </div>
-        </div>
-
-        <div className="px-5 py-4">
+        <div className="border-b border-slate-200 px-6 py-5">
           <div className="flex flex-wrap items-start justify-between gap-4">
-            
-          <div>
-            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-[#8c9ab5]">
-              Application Overview
-            </p>
 
             <div>
-              <div className="flex items-center gap-2">
-                <h1 className="font-mono text-xl font-bold text-[#1c2b4a]">{titleId}</h1>
+              <p className="text-xs font-semibold uppercase tracking-[2px] text-slate-500">
+                TDR History
+              </p>
+
+              <div className="mt-1 flex items-center gap-2">
+                <h1 className="font-mono text-2xl font-bold text-slate-900">
+                  {titleId}
+                </h1>
+
                 <button
-                  type="button"
                   onClick={() => void copyText(titleId)}
-                  className="text-[#8c9ab5] hover:text-[#1890ff]"
-                  aria-label="Copy application ID"
+                  className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-blue-600"
                 >
                   <FiCopy />
                 </button>
               </div>
 
-              <div className="mt-4 grid w-full gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                <div className="rounded-xl border border-[#eef2f7] bg-white p-4 shadow-sm">
-                  <p className="text-[10px] font-bold uppercase text-[#8c9ab5]">Owner</p>
-                  <p className="mt-2 text-sm font-semibold text-[#1c2b4a]">{displayOwner}</p>
-                </div>
+              <p className="mt-1 text-sm text-slate-500">
+                Application Overview & Transaction History
+              </p>
+            </div>
 
-                <div className="rounded-xl border border-[#eef2f7] bg-white p-4 shadow-sm">
-                  <p className="text-[10px] font-bold uppercase text-[#8c9ab5]">Samagra ID</p>
-                  <p className="mt-2 font-mono text-sm font-semibold text-[#1c2b4a]">
-                    {displaySamagraId}
-                  </p>
-                </div>
+            <div className="flex items-center gap-2">
 
-                <div className="rounded-xl border border-[#eef2f7] bg-white p-4 shadow-sm">
-                  <p className="text-[10px] font-bold uppercase text-[#8c9ab5]">Status</p>
-                  <p className="mt-2 text-sm font-semibold text-[#1c2b4a]">{displayStatus}</p>
-                </div>
+              <button
+                type="button"
+                className="
+            inline-flex items-center gap-2
+            rounded-lg border border-slate-300
+            bg-white px-4 py-2
+            text-sm font-medium text-slate-700
+            hover:bg-slate-50
+          "
+              >
+                <FiDownload />
+                Export
+              </button>
 
-                <div className="rounded-xl border border-[#eef2f7] bg-white p-4 shadow-sm">
-                  <p className="text-[10px] font-bold uppercase text-[#8c9ab5]">Value / Area</p>
-                  <p className="mt-2 text-sm font-semibold text-[#1c2b4a]">
-                    {displayTotalTdr} total
-                    <br />
-                    {displayRemainingTdr} remaining
-                    <br />
-                    Area: {displayArea}
-                  </p>
-                </div>
-              </div>
+              <Link
+                to="/dashboard/apply"
+                className="
+            inline-flex items-center gap-2
+            rounded-lg bg-slate-900
+            px-4 py-2
+            text-sm font-medium text-white
+            hover:bg-slate-800
+          "
+              >
+                <FiArrowLeft />
+                Back
+              </Link>
+
             </div>
           </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            {stats ? (
-              <>
-                <MetaChip label="RID" value={rid} icon={<TbTopologyStar3 />} />
-                <MetaChip label="Total Applications" value={String(stats.totalApps)} icon={<FiUsers />} />
-                <MetaChip
-                  label="Total TDR Value"
-                  value={`₹ ${n(stats.totalValue)}`}
-                  icon={<HiOutlineCurrencyRupee />}
-                />
-                <MetaChip
-                  label="Last Updated"
-                  value={formatDateTime(stats.lastUpdated)}
-                  icon={<FiCalendar />}
-                />
-              </>
-            ) : null}
-
-            <button
-              type="button"
-              className="ml-1 inline-flex items-center gap-2 rounded-lg border border-[#d6e4ff] bg-white px-4 py-2 text-sm font-semibold text-[#1c2b4a] shadow-sm transition hover:bg-[#f5f9ff]"
-            >
-              <FiDownload /> Export Report
-            </button>
-          </div>
         </div>
+
+        {/* APPLICATION INFO */}
+        <div className="grid gap-5 border-b border-slate-100 px-6 py-5 sm:grid-cols-2 lg:grid-cols-4">
+
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              Owner
+            </p>
+            <p className="mt-1 text-sm font-semibold text-slate-900">
+              {displayOwner}
+            </p>
+          </div>
+
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              Samagra ID
+            </p>
+            <p className="mt-1 font-mono text-sm font-semibold text-slate-900">
+              {displaySamagraId}
+            </p>
+          </div>
+
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              RID
+            </p>
+            <p className="mt-1 font-mono text-sm font-semibold text-slate-900">
+              {rid}
+            </p>
+          </div>
+
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              Status
+            </p>
+
+            <span className="mt-1 inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
+              {displayStatus}
+            </span>
+          </div>
+
         </div>
-      </section>
 
-      <section className="mt-4 rounded-3xl border border-[#dbeafe] bg-[#f8fbff] p-4 shadow-sm">
-        <div className="grid gap-4 xl:grid-cols-[1.7fr_1fr]">
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <label className="space-y-2 text-sm text-[#475569]">
-              <span className="block text-[10px] font-semibold uppercase tracking-wide">Search</span>
-              <input
-                type="search"
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder="RID, Application ID, Samagra ID, Tx hash"
-                className="w-full rounded-2xl border border-[#dbe3f7] bg-white px-3 py-2 text-sm text-[#1f2937] outline-none transition focus:border-[#1890ff] focus:ring-2 focus:ring-[#91caff]/40"
-              />
-            </label>
 
-            <label className="space-y-2 text-sm text-[#475569]">
-              <span className="block text-[10px] font-semibold uppercase tracking-wide">Owner</span>
-              <input
-                type="text"
-                value={ownerFilter}
-                onChange={(event) => setOwnerFilter(event.target.value)}
-                placeholder="Owner name"
-                className="w-full rounded-2xl border border-[#dbe3f7] bg-white px-3 py-2 text-sm text-[#1f2937] outline-none transition focus:border-[#1890ff] focus:ring-2 focus:ring-[#91caff]/40"
-              />
-            </label>
 
-            <label className="space-y-2 text-sm text-[#475569]">
-              <span className="block text-[10px] font-semibold uppercase tracking-wide">Transaction Type</span>
-              <select
-                value={transactionFilter}
-                onChange={(event) => setTransactionFilter(event.target.value as 'all' | 'transfer' | 'utilization')}
-                className="w-full rounded-2xl border border-[#dbe3f7] bg-white px-3 py-2 text-sm text-[#1f2937] outline-none transition focus:border-[#1890ff] focus:ring-2 focus:ring-[#91caff]/40"
-              >
-                <option value="all">All</option>
-                <option value="transfer">Transfer</option>
-                <option value="utilization">Utilization</option>
-              </select>
-            </label>
+        {/* KPI CARDS */}
+        <div className="grid gap-4 px-6 py-5 md:grid-cols-2 xl:grid-cols-4">
 
-            <label className="space-y-2 text-sm text-[#475569]">
-              <span className="block text-[10px] font-semibold uppercase tracking-wide">Status</span>
-              <select
-                value={statusFilter}
-                onChange={(event) => setStatusFilter(event.target.value as 'all' | 'created' | 'pending' | 'verified' | 'tampered')}
-                className="w-full rounded-2xl border border-[#dbe3f7] bg-white px-3 py-2 text-sm text-[#1f2937] outline-none transition focus:border-[#1890ff] focus:ring-2 focus:ring-[#91caff]/40"
-              >
-                <option value="all">All</option>
-                <option value="created">Created</option>
-                <option value="pending">Pending</option>
-                <option value="verified">Verified</option>
-                <option value="tampered">Tampered</option>
-              </select>
-            </label>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-2">
-            <label className="space-y-2 text-sm text-[#475569]">
-              <span className="block text-[10px] font-semibold uppercase tracking-wide">Date from</span>
-              <input
-                type="date"
-                value={dateFrom}
-                onChange={(event) => setDateFrom(event.target.value)}
-                className="w-full rounded-2xl border border-[#dbe3f7] bg-white px-3 py-2 text-sm text-[#1f2937] outline-none transition focus:border-[#1890ff] focus:ring-2 focus:ring-[#91caff]/40"
-              />
-            </label>
-
-            <label className="space-y-2 text-sm text-[#475569]">
-              <span className="block text-[10px] font-semibold uppercase tracking-wide">Date to</span>
-              <input
-                type="date"
-                value={dateTo}
-                onChange={(event) => setDateTo(event.target.value)}
-                className="w-full rounded-2xl border border-[#dbe3f7] bg-white px-3 py-2 text-sm text-[#1f2937] outline-none transition focus:border-[#1890ff] focus:ring-2 focus:ring-[#91caff]/40"
-              />
-            </label>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            <StatusTile
-              label="Blockchain Sync"
-              value={syncStatus}
-              tone={syncTone}
-            />
-            <StatusTile
-              label="Pending Anchoring"
-              value={`${anchorPendingCount}`}
-              tone={anchorPendingCount > 0 ? 'warning' : 'success'}
-            />
-            <StatusTile
-              label="Ledger Records"
-              value={`${stats?.ledgerCount ?? 0}`}
-              tone="muted"
-            />
-          </div>
-        </div>
-      </section>
-
-      {stats ? (
-        <section className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
           <KpiCard
-            label="Total Applications"
-            value={String(stats.totalApps)}
-            sub="All applications in this RID"
+            label="Applications"
+            value={String(stats?.totalApps ?? 0)}
+            sub="Transfer Applications in RID"
             icon={<FiFileText />}
-            iconBg="bg-[#e6f7ff]"
-            iconColor="text-[#1890ff]"
+            iconBg="bg-blue-50"
+            iconColor="text-blue-600"
           />
 
           <KpiCard
-            label="Total TDR Value"
-            value={`₹ ${n(stats.totalValue)}`}
-            sub="Sum of all applications"
-            icon={<HiOutlineCurrencyRupee />}
-            iconBg="bg-[#f6ffed]"
-            iconColor="text-[#52c41a]"
+            label="Area"
+            value={displayArea}
+            sub="Total available area"
+            icon={<FiMap />}
+            iconBg="bg-amber-50"
+            iconColor="text-amber-600"
           />
 
           <KpiCard
-            label="Transferred TDR Value"
-            value={`₹ ${n(stats.transferred)}`}
-            sub="Total transferred value"
-            icon={<FiSend />}
-            iconBg="bg-[#fff7e6]"
-            iconColor="text-[#fa8c16]"
+            label="Ledger Records"
+            value={String(stats?.ledgerCount ?? 0)}
+            sub="Blockchain entries"
+            icon={<TbTopologyStar3 />}
+            iconBg="bg-violet-50"
+            iconColor="text-violet-600"
           />
 
           <KpiCard
-            label="Utilized TDR Value"
-            value={`₹ ${n(stats.utilized)}`}
-            sub="Total utilized value"
+            label="Blockchain Sync"
+            value={syncStatus}
+            sub={`Pending: ${anchorPendingCount}`}
             icon={<FiCheckCircle />}
-            iconBg="bg-[#f9f0ff]"
-            iconColor="text-[#722ed1]"
+            iconBg="bg-emerald-50"
+            iconColor="text-emerald-600"
           />
-        </section>
-      ) : null}
+        </div>
+      </section>
 
       <nav className="mt-5 flex flex-wrap gap-5 border-b border-[#eef2f7] text-sm font-semibold">
         {RID_HISTORY_TABS.map((tab) => {
@@ -531,11 +386,10 @@ export default function TotalHistoryTreePage() {
               key={tab.id}
               type="button"
               onClick={() => setTab(tab.id)}
-              className={`flex items-center gap-1.5 border-b-2 pb-3 transition ${
-                isActive
-                  ? 'border-[#1890ff] text-[#1890ff]'
-                  : 'border-transparent text-[#8c9ab5] hover:text-[#1c2b4a]'
-              }`}
+              className={`flex items-center gap-1.5 border-b-2 pb-3 transition ${isActive
+                ? 'border-[#1890ff] text-[#1890ff]'
+                : 'border-transparent text-[#8c9ab5] hover:text-[#1c2b4a]'
+                }`}
             >
               {tab.label}
               {count != null && count > 0 ? <TabBadge count={count} /> : null}

@@ -151,10 +151,6 @@ function mapHistoryAppToRecord(
     0,
     totalArea- (proposedArea + transferredArea + utilizedArea),
   )
-console.log(remainingArea,"remainingArea");
-console.log(proposedArea,"proposedArea");
-console.log(transferredArea,"transferredArea");
-console.log(utilizedArea,"utilizedArea");
   // =========================
   // TDR VALUES
   // =========================
