@@ -1,5 +1,6 @@
-import { useEffect, useLayoutEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { FiArrowLeft, FiArrowRight, FiCalendar, FiGitBranch, FiShuffle, FiZap } from 'react-icons/fi'
 import { PageHeader } from '../components'
 import { useCertificatesSetDataLoading } from '../layout/certificatesDataLoadingContext'
@@ -8,7 +9,6 @@ import {
   buildTimelineRows,
   fetchTdrFullSnapshot,
   formatOwnerIdWithName,
-  type TdrFullSnapshot,
   type TimelineRow,
 } from '../../../api/tdrFullTimeline'
 
@@ -195,78 +195,52 @@ function TreeNode({ row, index, isLast }: { row: TimelineRow; index: number; isL
 
 export default function DrcHistoryTreePage() {
   const { drcId = '' } = useParams()
-  const [drcDetail, setDrcDetail] = useState<DrcDetailResponse | null>(null)
-  const [fullSnap, setFullSnap] = useState<TdrFullSnapshot | null>(null)
-  const [resolvedRid, setResolvedRid] = useState('')
-  const [phase, setPhase] = useState<'drc' | 'full' | 'done'>('drc')
-  const [error, setError] = useState<string | null>(null)
   const setCertificatesDataLoading = useCertificatesSetDataLoading()
+  const { data: historyData = null, isLoading: loading, error: queryError } = useQuery({
+    queryKey: ['drc-history-snapshot', drcId],
+    queryFn: async ({ signal }) => {
+      if (!drcId) return null
+      
+      const headers: Record<string, string> = {}
+      if (API_KEY) headers['x-api-key'] = API_KEY
+      
+      const dRes = await fetch(apiUrl(`/api/tdr/drc/${encodeURIComponent(drcId)}`), { headers, signal })
+      if (!dRes.ok) {
+        throw new Error(`Could not load DRC (HTTP ${dRes.status}).`)
+      }
+      const dJson = (await dRes.json()) as DrcDetailResponse
+      
+      const appId = dJson.drc?.application_id?.trim()
+      const rid = dJson.drc?.rid?.trim() ?? ''
+      const samagraId = dJson.drc?.owner?.samagra_id?.trim() ?? ''
+      
+      if (!appId) {
+        throw new Error('This DRC has no application id — history cannot be loaded.')
+      }
+      
+      const snap = await fetchTdrFullSnapshot(appId, rid, samagraId, API_KEY)
+      if (snap.ok === false) {
+        throw new Error(snap.error)
+      }
+      
+      return {
+        drcDetail: dJson,
+        fullSnap: snap.data,
+        resolvedRid: snap.resolvedRid
+      }
+    },
+    enabled: !!drcId,
+  })
 
-  useLayoutEffect(() => {
-    if (!drcId) {
-      setCertificatesDataLoading(false)
-      return
-    }
-    setCertificatesDataLoading(true)
-    return () => setCertificatesDataLoading(false)
-  }, [drcId, setCertificatesDataLoading])
+  const drcDetail = historyData?.drcDetail ?? null
+  const fullSnap = historyData?.fullSnap ?? null
+  const resolvedRid = historyData?.resolvedRid ?? ''
+  const phase = loading ? 'drc' : 'done'
+  const error = queryError instanceof Error ? queryError.message : queryError ? String(queryError) : null
 
   useEffect(() => {
-    let active = true
-    const run = async () => {
-      setError(null)
-      setDrcDetail(null)
-      setFullSnap(null)
-      setResolvedRid('')
-      setPhase('drc')
-      if (!drcId) {
-        setPhase('done')
-        return
-      }
-      try {
-        const headers: Record<string, string> = {}
-        if (API_KEY) headers['x-api-key'] = API_KEY
-        const dRes = await fetch(apiUrl(`/api/tdr/drc/${encodeURIComponent(drcId)}`), { headers })
-        if (!active) return
-        if (!dRes.ok) {
-          setError(`Could not load DRC (HTTP ${dRes.status}).`)
-          setPhase('done')
-          return
-        }
-        const dJson = (await dRes.json()) as DrcDetailResponse
-        setDrcDetail(dJson)
-        const appId = dJson.drc?.application_id?.trim()
-        const rid = dJson.drc?.rid?.trim() ?? ''
-        const samagraId = dJson.drc?.owner?.samagra_id?.trim() ?? ''
-        if (!appId) {
-          setError('This DRC has no application id — history cannot be loaded.')
-          setPhase('done')
-          return
-        }
-        setPhase('full')
-        const snap = await fetchTdrFullSnapshot(appId, rid, samagraId, API_KEY)
-        if (!active) return
-        if (snap.ok === false) {
-          setError(snap.error)
-          setPhase('done')
-          return
-        }
-        setFullSnap(snap.data)
-        setResolvedRid(snap.resolvedRid)
-      } catch {
-        if (active) setError('Network error while loading history.')
-      } finally {
-        if (active) {
-          setPhase('done')
-          setCertificatesDataLoading(false)
-        }
-      }
-    }
-    void run()
-    return () => {
-      active = false
-    }
-  }, [drcId, setCertificatesDataLoading])
+    setCertificatesDataLoading(loading)
+  }, [loading, setCertificatesDataLoading])
 
   const rows = useMemo(() => buildTimelineRows(fullSnap), [fullSnap])
   const transfers = fullSnap?.tdr?.transfers ?? []

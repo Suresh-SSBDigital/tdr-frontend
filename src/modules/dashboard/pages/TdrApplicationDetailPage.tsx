@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { apiRequest } from '../../../api/api'
 import { FiArrowRight, FiChevronRight, FiDownload, FiExternalLink, FiEye } from 'react-icons/fi'
 import BlockchainAnchor from '../../../components/BlockchainAnchor'
 import { useTdrApplications } from '../../../context/TdrApplicationsContext'
-import { apiUrl } from '../../../api/http'
 import { PageHeader, TdrWorkflowProgress } from '../components'
 import type { OfficerActivityEvent, TimelineStep } from '../data/tdrApplicationsData'
 import { buildStatutoryApprovalTimeline, resolveWorkflowStageId } from '../data/tdrWorkflowStages'
@@ -239,40 +240,40 @@ export default function TdrApplicationDetailPage() {
   const { applicationId } = useParams()
   const id = applicationId ? decodeURIComponent(applicationId) : ''
   const { applications } = useTdrApplications()
-  const [apiHistoryEvents, setApiHistoryEvents] = useState<OfficerActivityEvent[] | null>(null)
-  const [isApiHistoryLoading, setIsApiHistoryLoading] = useState(false)
+  const { data: apiHistoryEvents = null, isLoading: isApiHistoryLoading } = useQuery<OfficerActivityEvent[] | null>({
+    queryKey: ['blockchain-history', id],
+    queryFn: async ({ signal }) => {
+      if (!id) return null
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (API_KEY) headers['x-api-key'] = API_KEY
+      
+      try {
+        let resData: BackendBlockchainHistoryResponse
+        try {
+          resData = await apiRequest<BackendBlockchainHistoryResponse>({
+            method: 'GET',
+            url: `/api/tdr/${encodeURIComponent(id)}/history`,
+            headers,
+            signal,
+          })
+        } catch {
+          resData = await apiRequest<BackendBlockchainHistoryResponse>({
+            method: 'GET',
+            url: `/api/tdr/${encodeURIComponent(id)}/blockchain/history`,
+            headers,
+            signal,
+          })
+        }
+        const rows = resData.history ?? []
+        return rows.length > 0 ? mapApiHistoryToActivityEvents(rows) : []
+      } catch {
+        return null
+      }
+    },
+    enabled: !!id,
+  })
 
   const app = useMemo(() => applications.find((a) => a.id === id) ?? null, [applications, id])
-
-  useEffect(() => {
-    let active = true
-    const loadBlockchainHistory = async () => {
-      if (!id) return
-      setIsApiHistoryLoading(true)
-      try {
-        const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-        if (API_KEY) headers['x-api-key'] = API_KEY
-        let res = await fetch(apiUrl(`/api/tdr/${encodeURIComponent(id)}/history`), { headers })
-        if (!res.ok) {
-          res = await fetch(apiUrl(`/api/tdr/${encodeURIComponent(id)}/blockchain/history`), { headers })
-        }
-        if (!res.ok) return
-        const data = (await res.json()) as BackendBlockchainHistoryResponse
-        const rows = data.history ?? []
-        if (!active) return
-        setApiHistoryEvents(rows.length > 0 ? mapApiHistoryToActivityEvents(rows) : [])
-      } catch {
-        if (!active) return
-        setApiHistoryEvents(null)
-      } finally {
-        if (active) setIsApiHistoryLoading(false)
-      }
-    }
-    void loadBlockchainHistory()
-    return () => {
-      active = false
-    }
-  }, [id])
 
   const fallbackOfficerEvents = useMemo(() => {
     const log = app?.officerActivityLog

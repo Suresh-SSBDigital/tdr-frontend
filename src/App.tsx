@@ -1,5 +1,11 @@
 import { lazy } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import {
+  QueryClient,
+  QueryClientProvider,
+} from '@tanstack/react-query'
+
+const queryClient = new QueryClient()
 
 import { ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
@@ -46,6 +52,7 @@ const DrcByIdPage = lazy(() => import('./modules/dashboard/pages/DrcByIdPage'))
 
 function App() {
   return (
+    <QueryClientProvider client={queryClient}>
     <TdrProvider>
       <TdrApplicationsProvider>
         <BrowserRouter>
@@ -101,6 +108,7 @@ function App() {
         </BrowserRouter>
       </TdrApplicationsProvider>
     </TdrProvider>
+    </QueryClientProvider>
   )
 }
 

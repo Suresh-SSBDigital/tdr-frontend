@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { FiAlertCircle, FiArrowLeft, FiDownload, FiEye, FiFileText } from 'react-icons/fi'
 import { PageHeader } from '../components'
 import { useCertificatesSetDataLoading } from '../layout/certificatesDataLoadingContext'
@@ -23,75 +24,42 @@ const API_KEY = (import.meta.env.VITE_API_KEY ?? '').trim()
 
 export default function DrcApiDetailPage() {
   const { drcId = '' } = useParams()
-  const [detail, setDetail] = useState<DrcDetailResponse | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [fetchError, setFetchError] = useState<string | null>(null)
-  const [httpStatus, setHttpStatus] = useState<number | null>(null)
   const [showCertPreview, setShowCertPreview] = useState(false)
   const [pdfBusy, setPdfBusy] = useState(false)
   const certSheetRef = useRef<HTMLDivElement>(null)
   const setCertificatesDataLoading = useCertificatesSetDataLoading()
 
-  useLayoutEffect(() => {
-    if (!drcId) {
-      setCertificatesDataLoading(false)
-      return
-    }
-    setCertificatesDataLoading(true)
-    return () => setCertificatesDataLoading(false)
-  }, [drcId, setCertificatesDataLoading])
+  const { data: detail = null, isLoading, error: queryError } = useQuery<DrcDetailResponse | null>({
+    queryKey: ['drc-api-detail', drcId],
+    queryFn: async ({ signal }) => {
+      if (!drcId) return null
+      const headers: Record<string, string> = {}
+      if (API_KEY) headers['x-api-key'] = API_KEY
+      const res = await fetch(apiUrl(`/api/tdr/drc/${encodeURIComponent(drcId)}`), { headers, signal })
+      if (!res.ok) {
+        let msg = `The server returned ${res.status}.`
+        try {
+          const errBody = (await res.json()) as { message?: string; error?: string }
+          if (errBody.message) msg = errBody.message
+          else if (errBody.error) msg = errBody.error
+        } catch {
+          /* ignore */
+        }
+        const err = new Error(msg)
+        ;(err as any).status = res.status
+        throw err
+      }
+      return (await res.json()) as DrcDetailResponse
+    },
+    enabled: !!drcId,
+  })
+
+  const httpStatus = queryError && typeof queryError === 'object' && 'status' in queryError ? (queryError as any).status : null
+  const fetchError = queryError instanceof Error ? queryError.message : queryError ? String(queryError) : null
 
   useEffect(() => {
-    let active = true
-    const load = async () => {
-      setFetchError(null)
-      setHttpStatus(null)
-      setDetail(null)
-      try {
-        const headers: Record<string, string> = {}
-        if (API_KEY) headers['x-api-key'] = API_KEY
-        const res = await fetch(apiUrl(`/api/tdr/drc/${encodeURIComponent(drcId)}`), { headers })
-        if (!active) return
-        setHttpStatus(res.status)
-        if (!res.ok) {
-          let msg = `The server returned ${res.status}.`
-          try {
-            const errBody = (await res.json()) as { message?: string; error?: string }
-            if (errBody.message) msg = errBody.message
-            else if (errBody.error) msg = errBody.error
-          } catch {
-            /* ignore */
-          }
-          setFetchError(msg)
-          return
-        }
-        const data = (await res.json()) as DrcDetailResponse
-        if (!active) return
-        setDetail(data)
-      } catch (e) {
-        if (!active) return
-        setFetchError(e instanceof Error ? e.message : 'Could not reach the server.')
-        setHttpStatus(null)
-      } finally {
-        if (active) {
-          setIsLoading(false)
-          setCertificatesDataLoading(false)
-        }
-      }
-    }
-    if (!drcId) {
-      setIsLoading(false)
-      setFetchError(null)
-      setHttpStatus(null)
-      setCertificatesDataLoading(false)
-      return
-    }
-    setIsLoading(true)
-    void load()
-    return () => {
-      active = false
-    }
-  }, [drcId, setCertificatesDataLoading])
+    setCertificatesDataLoading(isLoading)
+  }, [isLoading, setCertificatesDataLoading])
 
   useEffect(() => {
     setShowCertPreview(false)

@@ -21,14 +21,23 @@ import {
 
 import { downloadDrcHistoryCsv } from '../helpers/csvHelpers'
 import { useCertificatesSetDataLoading } from '../layout/certificatesDataLoadingContext'
-import { apiUrl } from '../../../api/http'
 
 import type {
   ApiStatus,
   DrcApiTableRow,
+  DrcCertApiResponse,
 } from './drcFullHistoryPanel.types'
 
-const API_KEY = (import.meta.env.VITE_API_KEY ?? '').trim()
+export interface DrcFullHistoryPanelProps {
+  apiData: DrcCertApiResponse | null
+  apiIsLoading: boolean
+  apiError: unknown
+  pagination: PaginationState
+  setPagination: React.Dispatch<React.SetStateAction<PaginationState>>
+}
+
+
+
 
 // ======================================================
 // STYLES
@@ -117,7 +126,13 @@ const columnHelper = createColumnHelper<DrcApiTableRow>()
 // COMPONENT
 // ======================================================
 
-export default function DrcFullHistoryPanel() {
+export default function DrcFullHistoryPanel({
+  apiData,
+  apiIsLoading,
+  apiError,
+  pagination,
+  setPagination,
+}: DrcFullHistoryPanelProps) {
   const [rows, setRows] = useState<DrcApiTableRow[]>([])
   const [countTotal, setCountTotal] = useState(0)
 
@@ -151,143 +166,80 @@ export default function DrcFullHistoryPanel() {
       },
     ])
 
-  const [pagination, setPagination] =
-    useState<PaginationState>({
-      pageIndex: 0,
-      pageSize: 10,
-    })
-
-  // ======================================================
-  // API LOAD (Server-side pagination)
-  // ======================================================
+  const offset = pagination.pageIndex * pagination.pageSize
 
   useEffect(() => {
-    let active = true
+    setIsLoading(apiIsLoading)
+    if (apiError) {
+      setRows([])
+      setCountTotal(0)
+      setCertificatesDataLoading(false)
+      return
+    }
 
-    const loadDrcCertificatesPage = async () => {
-      setIsLoading(true)
+    if (!apiData) return
 
-      try {
-        const headers: Record<string, string> = {
-          'Content-Type': 'application/json',
-        }
+    const certs = apiData.certificates ?? []
+    const total = Number(apiData.countTotal ?? 0)
 
-        if (API_KEY) {
-          headers['x-api-key'] = API_KEY
-        }
+    setCountTotal(total)
 
-        const limit = pagination.pageSize
-        const offset = pagination.pageIndex * pagination.pageSize
+    const mappedRows: DrcApiTableRow[] = certs.map((item, pageIndex) => {
+      const absoluteIndex = offset + pageIndex
 
-        const qs = new URLSearchParams()
-        qs.set('limit', String(limit))
-        qs.set('offset', String(offset))
-        qs.set('sortDir', 'desc')
+      const appId = item.application_id?.trim() || `app-${absoluteIndex + 1}`
+      const ownerName = item.owner_name?.trim() || 'N/A'
+      const certNo = item.drc_certificate_no?.trim() || 'N/A'
 
-        const res = await fetch(apiUrl(`/api/tdr/drc-certificates?${qs.toString()}`), {
-          headers,
-        })
+      const parsed = item.updatedAt ? new Date(item.updatedAt) : null
+      const timestampEpoch =
+        parsed && !Number.isNaN(parsed.getTime()) ? parsed.getTime() : 0
+      const ts = timestampEpoch ? parsed?.toLocaleString('en-IN') ?? '—' : '—'
 
-        if (!res.ok) return
+      const drcStatus =
+        item.drc_status?.trim() || item.status?.trim() || 'UNKNOWN'
 
-        const jsonData = await res.json()
-
-        const data = jsonData as {
-          success?: boolean
-          countTotal?: number
-          certificates?: Array<{
-            application_id?: string
-            tdrApplicationId?: string
-            owner_name?: string
-            rid?: string
-            drc_id?: string
-            drc_certificate_no?: string
-            drc_generation_dt?: string
-            drc_date?: string
-            status?: string
-            drc_status?: string
-            updatedAt?: string
-            total_area?: number
-            proposed_area?: number
-            remaining_tdr_value?: number
-            drc_certificate?: string | { hash?: string }
-          }>
-        }
-        const certs = data.certificates ?? []
-        const total = Number(data.countTotal ?? 0)
-        if (!active) return
-
-        setCountTotal(total)
-
-        const mappedRows: DrcApiTableRow[] = certs.map((item, pageIndex) => {
-          const absoluteIndex = offset + pageIndex
-
-          const appId = item.application_id?.trim() || `app-${absoluteIndex + 1}`
-          const ownerName = item.owner_name?.trim() || 'N/A'
-          const certNo = item.drc_certificate_no?.trim() || 'N/A'
-
-          const parsed = item.updatedAt ? new Date(item.updatedAt) : null
-          const timestampEpoch =
-            parsed && !Number.isNaN(parsed.getTime()) ? parsed.getTime() : 0
-          const ts = timestampEpoch ? parsed?.toLocaleString('en-IN') ?? '—' : '—'
-
-          const drcStatus =
-            item.drc_status?.trim() || item.status?.trim() || 'UNKNOWN'
-
-          const statusMap: Record<string, ApiStatus> = {
-            DRC_GENERATED: 'VALID',
-            CREATED: 'EDITED',
-            APPROVED: 'VALID',
-            REJECTED: 'DELETED',
-          }
-
-          const mappedStatus = statusMap[drcStatus.toUpperCase()] ?? 'VALID'
-
-          return {
-            rowId: `api-${absoluteIndex}`,
-            certificateSno: absoluteIndex + 1,
-            certificateNo: certNo,
-            holderName: ownerName,
-            city: 'N/A',
-            treePath: certNo,
-            label: 'DRC certificate issued',
-            timestamp: ts,
-            status: mappedStatus,
-            actionType: 'CREATE',
-            actor: 'TDR API',
-            txHash: item.drc_id ?? '—',
-            blockNumber: absoluteIndex + 1,
-            notes: `Project status: ${item.status ?? 'UNKNOWN'}`,
-            applicationId: appId,
-            tdrApplicationId: item.tdrApplicationId ?? '—',
-            rid: item.rid ?? '—',
-            drcId: item.drc_id ?? '—',
-            drcStatus,
-            timestampEpoch,
-            totalArea: item.total_area,
-            proposedArea: item.proposed_area,
-            remainingTdrValue: item.remaining_tdr_value,
-          }
-        })
-
-        setRows(mappedRows)
-      } catch {
-        if (!active) return
-        setRows([])
-        setCountTotal(0)
-      } finally {
-        if (!active) return
-        setIsLoading(false)
-        setCertificatesDataLoading(false)
+      const statusMap: Record<string, ApiStatus> = {
+        DRC_GENERATED: 'VALID',
+        CREATED: 'EDITED',
+        APPROVED: 'VALID',
+        REJECTED: 'DELETED',
       }
-    }
 
-    void loadDrcCertificatesPage()
+      const mappedStatus = statusMap[drcStatus.toUpperCase()] ?? 'VALID'
 
-    return () => {
-      active = false
-    }
-  }, [pagination.pageIndex, pagination.pageSize, setCertificatesDataLoading])
+      return {
+        rowId: `api-${absoluteIndex}`,
+        certificateSno: absoluteIndex + 1,
+        certificateNo: certNo,
+        holderName: ownerName,
+        city: 'N/A',
+        treePath: certNo,
+        label: 'DRC certificate issued',
+        timestamp: ts,
+        status: mappedStatus,
+        actionType: 'CREATE',
+        actor: 'TDR API',
+        txHash: item.drc_id ?? '—',
+        blockNumber: absoluteIndex + 1,
+        notes: `Project status: ${item.status ?? 'UNKNOWN'}`,
+        applicationId: appId,
+        tdrApplicationId: item.tdrApplicationId ?? '—',
+        rid: item.rid ?? '—',
+        drcId: item.drc_id ?? '—',
+        drcStatus,
+        timestampEpoch,
+        totalArea: item.total_area,
+        proposedArea: item.proposed_area,
+        remainingTdrValue: item.remaining_tdr_value,
+      }
+    })
+
+    setRows(mappedRows)
+    setCertificatesDataLoading(false)
+  }, [apiData, apiError, apiIsLoading, offset, setCertificatesDataLoading])
+
+
 
   // ======================================================
   // UTILITY: Search across all row values

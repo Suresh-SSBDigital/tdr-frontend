@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+
 import { type TdrApplicationRecord } from '../modules/dashboard/data/tdrApplicationsData'
 import { apiUrl } from '../api/http'
 
@@ -346,7 +347,8 @@ export function TdrApplicationsProvider({ children }: { children: ReactNode }) {
         if (!res.ok) return
         const data = (await res.json()) as BackendHistoryResponse
         const apiRows = data.applications ?? []
-        if (!active || apiRows.length === 0) return
+        if (!active) return
+        // allow empty array as a valid response; StrictMode double-invoke should not block UI
         setApplications(apiRows.map(mapHistoryAppToRecord))
       } catch {
         // Leave list empty when API is unavailable.

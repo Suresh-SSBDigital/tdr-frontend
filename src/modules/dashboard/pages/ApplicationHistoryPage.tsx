@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import {useMemo } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { FiArrowLeft } from 'react-icons/fi'
 import { apiUrl } from '../../../api/http'
 import { resolveSamagraIdForApplication } from '../../../api/tdrFullTimeline'
@@ -16,71 +17,47 @@ export default function ApplicationHistoryPage() {
   const decodedId = decodeURIComponent(applicationId ?? '')
   const queryRid = new URLSearchParams(location.search).get('rid')?.trim() ?? ''
   const querySamagra = new URLSearchParams(location.search).get('samagra_id')?.trim() ?? ''
-  const [full, setFull] = useState<FullResponse | null>(null)
-  const [history, setHistory] = useState<HistoryResponse | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const { data: pageData = null, isLoading, error: queryError } = useQuery({
+    queryKey: ['application-history', decodedId, querySamagra],
+    queryFn: async ({ signal }) => {
+      if (!decodedId) return null
 
-  const [samagraForLinks, setSamagraForLinks] = useState(querySamagra)
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (API_KEY) headers['x-api-key'] = API_KEY
 
+      const hRes = await fetch(apiUrl(`/api/tdr/${encodeURIComponent(decodedId)}/blockchain/history`), { headers, signal })
+      const hData = hRes.ok ? ((await hRes.json()) as HistoryResponse) : null
 
-  useEffect(() => {
-    setSamagraForLinks(querySamagra)
-  }, [querySamagra])
-
-  useEffect(() => {
-    let active = true
-    if (!decodedId) return
-    const load = async () => {
-      setIsLoading(true)
-
-
-      setError(null)
-      // Triggered loading; UI doesn't currently consume isLoading.
-
-      try {
-        const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-        if (API_KEY) headers['x-api-key'] = API_KEY
-        const hRes = await fetch(apiUrl(`/api/tdr/${encodeURIComponent(decodedId)}/blockchain/history`), { headers })
-        const hData = hRes.ok ? ((await hRes.json()) as HistoryResponse) : null
-        if (!active) return
-        setHistory(hData)
-
-        let samagraId = querySamagra
-        if (!samagraId) {
-          samagraId = await resolveSamagraIdForApplication(decodedId, API_KEY)
-        }
-        if (!samagraId) {
-          if (active) {
-            setFull(null)
-            setSamagraForLinks('')
-            setError('Samagra ID is required. Use “View history” from the applications list, or add ?samagra_id=… to the URL.')
-          }
-          return
-        }
-        if (active) setSamagraForLinks(samagraId)
-
-        const fullUrl = apiUrl(
-          `/api/tdr/${encodeURIComponent(decodedId)}/full?samagra_id=${encodeURIComponent(samagraId)}`,
-        )
-        const fRes = await fetch(fullUrl, { headers })
-        if (!fRes.ok) {
-          if (active) setError(`Unable to load details (HTTP ${fRes.status})`)
-          return
-        }
-        const fData = (await fRes.json()) as FullResponse
-        if (active) setFull(fData)
-      } catch {
-        if (active) setError('Unable to load data.')
-      } finally {
-        if (active) setIsLoading(false)
+      let samagraId = querySamagra
+      if (!samagraId) {
+        samagraId = await resolveSamagraIdForApplication(decodedId, API_KEY)
       }
-    }
-    void load()
-    return () => {
-      active = false
-    }
-  }, [decodedId, querySamagra])
+      if (!samagraId) {
+        throw new Error('Samagra ID is required. Use “View history” from the applications list, or add ?samagra_id=… to the URL.')
+      }
+
+      const fullUrl = apiUrl(
+        `/api/tdr/${encodeURIComponent(decodedId)}/full?samagra_id=${encodeURIComponent(samagraId)}`,
+      )
+      const fRes = await fetch(fullUrl, { headers, signal })
+      if (!fRes.ok) {
+        throw new Error(`Unable to load details (HTTP ${fRes.status})`)
+      }
+      const fData = (await fRes.json()) as FullResponse
+
+      return {
+        hData,
+        fData,
+        samagraId
+      }
+    },
+    enabled: !!decodedId,
+  })
+
+  const history = pageData?.hData ?? null
+  const full = pageData?.fData ?? null
+  const samagraForLinks = pageData?.samagraId ?? querySamagra
+  const error = queryError instanceof Error ? queryError.message : queryError ? String(queryError) : null
 
   const tdr = full?.tdr
   const lastHistory = history?.history?.[history.history.length - 1]

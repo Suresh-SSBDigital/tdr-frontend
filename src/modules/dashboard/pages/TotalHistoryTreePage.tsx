@@ -1,15 +1,16 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback,useMemo, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { FiArrowLeft, FiCopy, FiDownload, FiFileText, FiMap, FiCheckCircle } from 'react-icons/fi'
 import { TbTopologyStar3 } from 'react-icons/tb'
 import type { ReactFlowInstance } from '@xyflow/react'
-import { apiUrl } from '../../../api/http'
 import {
   computeRidStats,
   RID_HISTORY_TABS,
   type RidHistoryResponse,
   type RidHistoryTabId,
 } from '../helpers/ridHistoryTree'
+import { useQuery } from '@tanstack/react-query'
+import { apiRequest } from '../../../api/api'
 import { copyText, n } from './totalHistory/format'
 import {
   AllTransactionsTab,
@@ -69,9 +70,32 @@ export default function TotalHistoryTreePage() {
   const rid = searchParams.get('rid')?.trim() ?? ''
   const activeTab = parseTab(searchParams.get('tab'))
 
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [historyData, setHistoryData] = useState<RidHistoryResponse | null>(null)
+  const {
+    data: historyData = null,
+    isLoading: loading,
+    error: queryError,
+  } = useQuery<RidHistoryResponse | null>({
+    queryKey: ['rid-history', rid],
+    queryFn: ({ signal }) => {
+      if (!rid) return Promise.resolve(null)
+      const headers: Record<string, string> = {}
+      if (API_KEY) headers['x-api-key'] = API_KEY
+      return apiRequest<RidHistoryResponse>({
+        method: 'GET',
+        url: `/api/tdr/rid/${encodeURIComponent(rid)}/history`,
+        headers,
+        signal,
+      })
+    },
+    enabled: !!rid,
+  })
+
+  const error = !rid
+    ? 'RID is required to view total history.'
+    : queryError
+    ? (queryError instanceof Error ? queryError.message : 'Error loading RID history')
+    : null
+
   const [hideUtilizations, setHideUtilizations] = useState(false)
   const [rfApi, setRfApi] = useState<Pick<ReactFlowInstance, 'fitView' | 'zoomIn' | 'zoomOut'> | null>(
     null,
@@ -159,47 +183,7 @@ export default function TotalHistoryTreePage() {
     [searchParams, setSearchParams],
   )
 
-  useEffect(() => {
-    let active = true
-    const run = async () => {
-      if (!rid) {
-        setError('RID is required to view total history.')
-        setHistoryData(null)
-        return
-      }
 
-      setLoading(true)
-      setError(null)
-      try {
-        const headers: Record<string, string> = {}
-        if (API_KEY) headers['x-api-key'] = API_KEY
-
-        const res = await fetch(apiUrl(`/api/tdr/rid/${encodeURIComponent(rid)}/history`), { headers })
-        if (!active) return
-
-        if (!res.ok) {
-          setError(`Could not load history (HTTP ${res.status}).`)
-          setHistoryData(null)
-          return
-        }
-
-        const json = (await res.json()) as RidHistoryResponse
-        setHistoryData(json)
-      } catch {
-        if (active) {
-          setError('Network error while loading total history.')
-          setHistoryData(null)
-        }
-      } finally {
-        if (active) setLoading(false)
-      }
-    }
-
-    void run()
-    return () => {
-      active = false
-    }
-  }, [rid])
 
   const stats = useMemo(() => {
     if (!filteredHistoryData?.applications?.length) return null
